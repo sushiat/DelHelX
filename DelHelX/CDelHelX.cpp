@@ -199,12 +199,15 @@ void CDelHelX::OnGetTagItem(EuroScopePlugIn::CFlightPlan FlightPlan, EuroScopePl
 		double polyY_estands[] = { 48.116643, 48.113487, 48.114228, 48.117365 };
 		double polyX_fstands[] = { 16.569615, 16.573935, 16.572986, 16.571244 };
 		double polyY_fstands[] = { 48.116094, 48.114711, 48.117773, 48.118331 };
-		double polyX_gac[] = { 16.535561, 16.537167, 16.538735, 16.537153 };
-		double polyY_gac[] = { 48.126884, 48.126374, 48.128333, 48.128849 };
+		double polyX_gac_north[] = { 16.535561, 16.537167, 16.538735, 16.537153 };
+		double polyY_gac_north[] = { 48.126884, 48.126374, 48.128333, 48.128849 };
+		double polyX_gac_south[] = { 16.535321, 16.536082, 16.536605, 16.535996 };
+		double polyY_gac_south[] = { 48.125603, 48.125327, 48.126032, 48.126227 };
 		if (CDelHelX::PointInsidePolygon(4, polyX_bstands, polyY_bstands, position.m_Longitude, position.m_Latitude) ||
 			CDelHelX::PointInsidePolygon(4, polyX_estands, polyY_estands, position.m_Longitude, position.m_Latitude) ||
 			CDelHelX::PointInsidePolygon(4, polyX_fstands, polyY_fstands, position.m_Longitude, position.m_Latitude) ||
-			CDelHelX::PointInsidePolygon(4, polyX_gac, polyY_gac, position.m_Longitude, position.m_Latitude))
+			CDelHelX::PointInsidePolygon(4, polyX_gac_north, polyY_gac_north, position.m_Longitude, position.m_Latitude) ||
+			CDelHelX::PointInsidePolygon(4, polyX_gac_south, polyY_gac_south, position.m_Longitude, position.m_Latitude))
 		{
 			strcpy_s(sItemString, 16, "T");
 			*pColorCode = EuroScopePlugIn::TAG_COLOR_RGB_DEFINED;
@@ -241,12 +244,15 @@ void CDelHelX::OnFunctionCall(int FunctionId, const char* sItemString, POINT Pt,
 				double polyY_estands[] = { 48.116643, 48.113487, 48.114228, 48.117365 };
 				double polyX_fstands[] = { 16.569615, 16.573935, 16.572986, 16.571244 };
 				double polyY_fstands[] = { 48.116094, 48.114711, 48.117773, 48.118331 };
-				double polyX_gac[] = { 16.535561, 16.537167, 16.538735, 16.537153 };
-				double polyY_gac[] = { 48.126884, 48.126374, 48.128333, 48.128849 };
+				double polyX_gac_north[] = { 16.535561, 16.537167, 16.538735, 16.537153 };
+				double polyY_gac_north[] = { 48.126884, 48.126374, 48.128333, 48.128849 };
+				double polyX_gac_south[] = { 16.535321, 16.536082, 16.536605, 16.535996 };
+				double polyY_gac_south[] = { 48.125603, 48.125327, 48.126032, 48.126227 };
 				if (CDelHelX::PointInsidePolygon(4, polyX_bstands, polyY_bstands, position.m_Longitude, position.m_Latitude) ||
 					CDelHelX::PointInsidePolygon(4, polyX_estands, polyY_estands, position.m_Longitude, position.m_Latitude) ||
 					CDelHelX::PointInsidePolygon(4, polyX_fstands, polyY_fstands, position.m_Longitude, position.m_Latitude) ||
-					CDelHelX::PointInsidePolygon(4, polyX_gac, polyY_gac, position.m_Longitude, position.m_Latitude))
+					CDelHelX::PointInsidePolygon(4, polyX_gac_north, polyY_gac_north, position.m_Longitude, position.m_Latitude) ||
+					CDelHelX::PointInsidePolygon(4, polyX_gac_south, polyY_gac_south, position.m_Longitude, position.m_Latitude))
 				{
 					std::string scratchBackup(fp.GetControllerAssignedData().GetScratchPadString());
 					fp.GetControllerAssignedData().SetScratchPadString("ST-UP");
