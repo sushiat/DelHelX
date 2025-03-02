@@ -12,6 +12,7 @@
 const char SETTINGS_DELIMITER = '|';
 
 const int TAG_ITEM_PS_HELPER = 1;
+const int TAG_ITEM_TAXIOUT = 2;
 
 const int TAG_FUNC_ON_FREQ = 100;
 

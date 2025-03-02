@@ -18,7 +18,8 @@ CDelHelX::CDelHelX() : EuroScopePlugIn::CPlugIn(
 	this->LogMessage(msg.str(), "Init");
 
 	this->RegisterTagItemType("Push+Start Helper", TAG_ITEM_PS_HELPER);
-	this->RegisterTagItemFunction("Set ONFREQ", TAG_FUNC_ON_FREQ);
+	this->RegisterTagItemType("Taxi out?", TAG_ITEM_TAXIOUT);
+	this->RegisterTagItemFunction("Set ONFREQ/STUP/PUSH", TAG_FUNC_ON_FREQ);
 
 	this->RegisterDisplayType(PLUGIN_NAME, true, false, false, false);
 
@@ -147,15 +148,19 @@ bool CDelHelX::OnCompileCommand(const char* sCommandLine)
 
 void CDelHelX::OnGetTagItem(EuroScopePlugIn::CFlightPlan FlightPlan, EuroScopePlugIn::CRadarTarget RadarTarget, int ItemCode, int TagData, char sItemString[16], int* pColorCode, COLORREF* pRGB, double* pFontSize)
 {
-	if (!FlightPlan.IsValid()) {
+	if (!FlightPlan.IsValid()) 
+	{
 		return;
 	}
 	
-	if (ItemCode == TAG_ITEM_PS_HELPER) {
+	if (ItemCode == TAG_ITEM_PS_HELPER) 
+	{
 		validation res = this->ProcessFlightPlan(FlightPlan, RadarTarget);
 
-		if (res.valid) {
-			if (res.tag.empty()) {
+		if (res.valid) 
+		{
+			if (res.tag.empty()) 
+			{
 				strcpy_s(sItemString, 16, "??");
 			}
 			else
@@ -165,7 +170,8 @@ void CDelHelX::OnGetTagItem(EuroScopePlugIn::CFlightPlan FlightPlan, EuroScopePl
 
 			*pColorCode = EuroScopePlugIn::TAG_COLOR_RGB_DEFINED;
 
-			if (res.color == TAG_COLOR_NONE) {
+			if (res.color == TAG_COLOR_NONE) 
+			{
 				*pRGB = TAG_COLOR_GREEN;
 			}
 			else {
@@ -176,10 +182,37 @@ void CDelHelX::OnGetTagItem(EuroScopePlugIn::CFlightPlan FlightPlan, EuroScopePl
 		{
 			strcpy_s(sItemString, 16, res.tag.c_str());
 
-			if (res.color != TAG_COLOR_NONE) {
+			if (res.color != TAG_COLOR_NONE) 
+			{
 				*pColorCode = EuroScopePlugIn::TAG_COLOR_RGB_DEFINED;
 				*pRGB = res.color;
 			}
+		}
+	}
+	else if (ItemCode == TAG_ITEM_TAXIOUT)
+	{
+		EuroScopePlugIn::CPosition position = RadarTarget.GetPosition().GetPosition();
+
+		double polyX_bstands[] = { 16.552188, 16.554506, 16.556262, 16.553642 };
+		double polyY_bstands[] = { 48.120075, 48.119410, 48.121754, 48.122101 };
+		double polyX_estands[] = { 16.563117, 16.572832, 16.573309, 16.563665 };
+		double polyY_estands[] = { 48.116643, 48.113487, 48.114228, 48.117365 };
+		double polyX_fstands[] = { 16.569615, 16.573935, 16.572986, 16.571244 };
+		double polyY_fstands[] = { 48.116094, 48.114711, 48.117773, 48.118331 };
+		double polyX_gac[] = { 16.535561, 16.537167, 16.538735, 16.537153 };
+		double polyY_gac[] = { 48.126884, 48.126374, 48.128333, 48.128849 };
+		if (CDelHelX::PointInsidePolygon(4, polyX_bstands, polyY_bstands, position.m_Longitude, position.m_Latitude) ||
+			CDelHelX::PointInsidePolygon(4, polyX_estands, polyY_estands, position.m_Longitude, position.m_Latitude) ||
+			CDelHelX::PointInsidePolygon(4, polyX_fstands, polyY_fstands, position.m_Longitude, position.m_Latitude) ||
+			CDelHelX::PointInsidePolygon(4, polyX_gac, polyY_gac, position.m_Longitude, position.m_Latitude))
+		{
+			strcpy_s(sItemString, 16, "T");
+			*pColorCode = EuroScopePlugIn::TAG_COLOR_RGB_DEFINED;
+			*pRGB = TAG_COLOR_GREEN;
+		}
+		else
+		{
+			strcpy_s(sItemString, 16, "P");
 		}
 	}
 }
@@ -200,11 +233,31 @@ void CDelHelX::OnFunctionCall(int FunctionId, const char* sItemString, POINT Pt,
 			// Are we ground or higher?
 			if (this->ControllerMyself().GetFacility() >= 3)
 			{
-				// TODO can we define polygons for taxi out stands? and issue push if not in it?
+				EuroScopePlugIn::CPosition position = rt.GetPosition().GetPosition();
 
-				std::string scratchBackup(fp.GetControllerAssignedData().GetScratchPadString());
-				fp.GetControllerAssignedData().SetScratchPadString("ST-UP");
-				fp.GetControllerAssignedData().SetScratchPadString(scratchBackup.c_str());
+				double polyX_bstands[] = { 16.552188, 16.554506, 16.556262, 16.553642 };
+				double polyY_bstands[] = { 48.120075, 48.119410, 48.121754, 48.122101 };
+				double polyX_estands[] = { 16.563117, 16.572832, 16.573309, 16.563665 };
+				double polyY_estands[] = { 48.116643, 48.113487, 48.114228, 48.117365 };
+				double polyX_fstands[] = { 16.569615, 16.573935, 16.572986, 16.571244 };
+				double polyY_fstands[] = { 48.116094, 48.114711, 48.117773, 48.118331 };
+				double polyX_gac[] = { 16.535561, 16.537167, 16.538735, 16.537153 };
+				double polyY_gac[] = { 48.126884, 48.126374, 48.128333, 48.128849 };
+				if (CDelHelX::PointInsidePolygon(4, polyX_bstands, polyY_bstands, position.m_Longitude, position.m_Latitude) ||
+					CDelHelX::PointInsidePolygon(4, polyX_estands, polyY_estands, position.m_Longitude, position.m_Latitude) ||
+					CDelHelX::PointInsidePolygon(4, polyX_fstands, polyY_fstands, position.m_Longitude, position.m_Latitude) ||
+					CDelHelX::PointInsidePolygon(4, polyX_gac, polyY_gac, position.m_Longitude, position.m_Latitude))
+				{
+					std::string scratchBackup(fp.GetControllerAssignedData().GetScratchPadString());
+					fp.GetControllerAssignedData().SetScratchPadString("ST-UP");
+					fp.GetControllerAssignedData().SetScratchPadString(scratchBackup.c_str());
+				}
+				else
+				{
+					std::string scratchBackup(fp.GetControllerAssignedData().GetScratchPadString());
+					fp.GetControllerAssignedData().SetScratchPadString("PUSH");
+					fp.GetControllerAssignedData().SetScratchPadString(scratchBackup.c_str());
+				}
 			}
 			else
 			{
@@ -236,7 +289,7 @@ void CDelHelX::LoadSettings()
 	if (settings) {
 		std::vector<std::string> splitSettings = split(settings, SETTINGS_DELIMITER);
 
-		if (splitSettings.size() < 3) {
+		if (splitSettings.size() < 2) {
 			this->LogMessage("Invalid saved settings found, reverting to default.", "Settings");
 
 			this->SaveSettings();
@@ -353,10 +406,10 @@ validation CDelHelX::ProcessFlightPlan(EuroScopePlugIn::CFlightPlan& fp, EuroSco
 	if (this->radarScreen->groundOnline || this->groundOverride)
 	{
 		// Bounding box coordinates for 121.775 ground frequency
-		// TL 48.129167 16.53675 // GAC top left
-		// TR 48.117222 16.570472 // Terminal 2 top right
 		// BL 48.123917 16.533667 // HP Rwy 11 bottom left
 		// BR 48.113056 16.567444 // HP Rwy 29 (A4) bottom right
+		// TR 48.117222 16.570472 // Terminal 2 top right
+		// TL 48.129167 16.53675 // GAC top left
 		double polyX[] = { 16.533667, 16.567444, 16.570472, 16.53675 };
 		double polyY[] = { 48.123917, 48.113056, 48.117222, 48.129167 };
 		EuroScopePlugIn::CPosition position = rt.GetPosition().GetPosition();
