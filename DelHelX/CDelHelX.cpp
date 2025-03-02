@@ -22,9 +22,11 @@ CDelHelX::CDelHelX() : EuroScopePlugIn::CPlugIn(
 
 	this->RegisterDisplayType(PLUGIN_NAME, true, false, false, false);
 
-	this->debug = false;
 	this->updateCheck = false;
 	this->flashOnMessage = false;
+	this->groundOverride = false;
+	this->towerOverride = false;
+	this->noChecks = false;
 
 	this->LoadSettings();
 
@@ -41,32 +43,22 @@ bool CDelHelX::OnCompileCommand(const char* sCommandLine)
 {
 	std::vector<std::string> args = split(sCommandLine);
 
-	if (starts_with(args[0], ".delhelx")) {
-		if (args.size() == 1) {
+	if (starts_with(args[0], ".delhelx")) 
+	{
+		if (args.size() == 1) 
+		{
 			std::ostringstream msg;
-			msg << "Version " << PLUGIN_VERSION << " loaded. Available commands: auto, debug, reload, reset, update, flash";
+			msg << "Version " << PLUGIN_VERSION << " loaded. Available commands: gnd, twr, nocheck, reset, update, flash";
 
 			this->LogMessage(msg.str(), "Init");
 
 			return true;
 		}
 
-		if (args[1] == "debug") {
-			if (this->debug) {
-				this->LogMessage("Disabling debug mode", "Debug");
-			}
-			else {
-				this->LogMessage("Enabling debug mode", "Debug");
-			}
-
-			this->debug = !this->debug;
-
-			this->SaveSettings();
-
-			return true;
-		}
-		else if (args[1] == "update") {
-			if (this->updateCheck) {
+		if (args[1] == "update") 
+		{
+			if (this->updateCheck) 
+			{
 				this->LogMessage("Disabling update check", "Update");
 			}
 			else {
@@ -79,8 +71,10 @@ bool CDelHelX::OnCompileCommand(const char* sCommandLine)
 
 			return true;
 		}
-		else if (args[1] == "flash") {
-			if (this->flashOnMessage) {
+		else if (args[1] == "flash") 
+		{
+			if (this->flashOnMessage) 
+			{
 				this->LogMessage("No longer flashing on DelHel message", "Config");
 			}
 			else {
@@ -88,6 +82,61 @@ bool CDelHelX::OnCompileCommand(const char* sCommandLine)
 			}
 
 			this->flashOnMessage = !this->flashOnMessage;
+
+			this->SaveSettings();
+
+			return true;
+		}
+		else if (args[1] == "gnd")
+		{
+			if (this->groundOverride)
+			{
+				this->LogMessage("GND freq override OFF", "GND");
+			}
+			else {
+				this->LogMessage("GND freq override ON", "GND");
+			}
+
+			this->groundOverride = !this->groundOverride;
+
+			return true;
+		}
+		else if (args[1] == "twr")
+		{
+			if (this->towerOverride)
+			{
+				this->LogMessage("TWR freq override OFF", "TWR");
+			}
+			else {
+				this->LogMessage("TWR freq override ON", "TWR");
+			}
+
+			this->towerOverride = !this->towerOverride;
+
+			return true;
+		}
+		else if (args[1] == "nocheck")
+		{
+			if (this->noChecks)
+			{
+				this->LogMessage("Flight plan checks turned ON", "Checks");
+			}
+			else {
+				this->LogMessage("Flight plan checks turned OFF, use only for testing!!!", "Checks");
+			}
+
+			this->noChecks = !this->noChecks;
+
+			return true;
+		}
+		else if (args[1] == "reset")
+		{
+			this->LogMessage("Resetting DelHelX plugin to defaults", "Defaults");
+			this->updateCheck = false;
+			this->flashOnMessage = false;
+			this->groundOverride = false;
+			this->towerOverride = false;
+			this->noChecks = false;
 
 			this->SaveSettings();
 
@@ -104,40 +153,36 @@ void CDelHelX::OnGetTagItem(EuroScopePlugIn::CFlightPlan FlightPlan, EuroScopePl
 		return;
 	}
 	
-	switch (ItemCode) {
-		case TAG_ITEM_PS_HELPER:
-			validation res = this->ProcessFlightPlan(FlightPlan, RadarTarget);
+	if (ItemCode == TAG_ITEM_PS_HELPER) {
+		validation res = this->ProcessFlightPlan(FlightPlan, RadarTarget);
 
-			if (res.valid) {
-				if (res.tag.empty()) {
-					strcpy_s(sItemString, 16, "??");
-				}
-				else
-				{
-					strcpy_s(sItemString, 16, res.tag.c_str());
-				}
-
-				*pColorCode = EuroScopePlugIn::TAG_COLOR_RGB_DEFINED;
-
-				if (res.color == TAG_COLOR_NONE) {
-					*pRGB = TAG_COLOR_GREEN;
-				}
-				else {
-					*pRGB = res.color;
-				}
+		if (res.valid) {
+			if (res.tag.empty()) {
+				strcpy_s(sItemString, 16, "??");
 			}
 			else
 			{
 				strcpy_s(sItemString, 16, res.tag.c_str());
-
-				if (res.color != TAG_COLOR_NONE) {
-					*pColorCode = EuroScopePlugIn::TAG_COLOR_RGB_DEFINED;
-					*pRGB = res.color;
-				}
 			}
-		
-			break;
 
+			*pColorCode = EuroScopePlugIn::TAG_COLOR_RGB_DEFINED;
+
+			if (res.color == TAG_COLOR_NONE) {
+				*pRGB = TAG_COLOR_GREEN;
+			}
+			else {
+				*pRGB = res.color;
+			}
+		}
+		else
+		{
+			strcpy_s(sItemString, 16, res.tag.c_str());
+
+			if (res.color != TAG_COLOR_NONE) {
+				*pColorCode = EuroScopePlugIn::TAG_COLOR_RGB_DEFINED;
+				*pRGB = res.color;
+			}
+		}
 	}
 }
 
@@ -150,17 +195,27 @@ void CDelHelX::OnFunctionCall(int FunctionId, const char* sItemString, POINT Pt,
 
 	EuroScopePlugIn::CRadarTarget rt = fp.GetCorrelatedRadarTarget();
 
-	switch (FunctionId) {
-		case TAG_FUNC_ON_FREQ:
-			validation res = this->ProcessFlightPlan(fp, rt);
-			if (res.valid)
+	if (FunctionId == TAG_FUNC_ON_FREQ) {
+		validation res = this->ProcessFlightPlan(fp, rt);
+		if (res.valid)
+		{
+			// Are we ground or higher?
+			if (this->ControllerMyself().GetFacility() >= 3)
 			{
+				// TODO can we define polygons for taxi out stands? and issue push if not in it?
+
+				std::string scratchBackup(fp.GetControllerAssignedData().GetScratchPadString());
+				fp.GetControllerAssignedData().SetScratchPadString("ST-UP");
+				fp.GetControllerAssignedData().SetScratchPadString(scratchBackup.c_str());
+			}
+			else
+			{
+				// We are delivery set ONFREQ
 				std::string scratchBackup(fp.GetControllerAssignedData().GetScratchPadString());
 				fp.GetControllerAssignedData().SetScratchPadString("ONFREQ");
 				fp.GetControllerAssignedData().SetScratchPadString(scratchBackup.c_str());
 			}
-
-			break;
+		}
 	}
 }
 
@@ -184,29 +239,27 @@ void CDelHelX::LoadSettings()
 		std::vector<std::string> splitSettings = split(settings, SETTINGS_DELIMITER);
 
 		if (splitSettings.size() < 3) {
-			this->LogMessage("Invalid saved settings found, reverting to default.");
+			this->LogMessage("Invalid saved settings found, reverting to default.", "Settings");
 
 			this->SaveSettings();
 
 			return;
 		}
 
-		std::istringstream(splitSettings[0]) >> this->debug;
-		std::istringstream(splitSettings[1]) >> this->updateCheck;
-		std::istringstream(splitSettings[2]) >> this->flashOnMessage;
+		std::istringstream(splitSettings[0]) >> this->updateCheck;
+		std::istringstream(splitSettings[1]) >> this->flashOnMessage;
 
-		this->LogDebugMessage("Successfully loaded settings.");
+		this->LogMessage("Successfully loaded settings.", "Settings");
 	}
 	else {
-		this->LogMessage("No saved settings found, using defaults.");
+		this->LogMessage("No saved settings found, using defaults.", "Settings");
 	}
 }
 
 void CDelHelX::SaveSettings()
 {
 	std::ostringstream ss;
-	ss << this->debug << SETTINGS_DELIMITER
-		<< this->updateCheck << SETTINGS_DELIMITER
+	ss << this->updateCheck << SETTINGS_DELIMITER
 		<< this->flashOnMessage;
 
 	this->SaveDataToSettings(PLUGIN_NAME, "DelHelX settings", ss.str().c_str());
@@ -220,13 +273,19 @@ validation CDelHelX::ProcessFlightPlan(EuroScopePlugIn::CFlightPlan& fp, EuroSco
 		TAG_COLOR_NONE // color
 	};
 
+	std::string groundState = fp.GetGroundState();
+	if (!groundState.empty())
+	{
+		
+	}
+
 	std::string cs = fp.GetCallsign();
 
 	EuroScopePlugIn::CFlightPlanData fpd = fp.GetFlightPlanData();
 	std::string dep = fpd.GetOrigin();
 	to_upper(dep);
 
-	if (strcmp(dep.c_str(), "LOWW") != 0)
+	if (!this->noChecks && strcmp(dep.c_str(), "LOWW") != 0)
 	{
 		res.valid = false;
 		res.tag = "ADEP";
@@ -236,7 +295,7 @@ validation CDelHelX::ProcessFlightPlan(EuroScopePlugIn::CFlightPlan& fp, EuroSco
 	}
 
 	bool clearanceFlag = fp.GetClearenceFlag();
-	if (!clearanceFlag)
+	if (!this->noChecks && !clearanceFlag)
 	{
 		res.valid = false;
 		res.tag = "!CLR";
@@ -246,7 +305,7 @@ validation CDelHelX::ProcessFlightPlan(EuroScopePlugIn::CFlightPlan& fp, EuroSco
 	}
 	
 	std::string rwy = fpd.GetDepartureRwy();
-	if (rwy == "") 
+	if (!this->noChecks && rwy.empty())
 	{
 		res.valid = false;
 		res.tag = "!RWY";
@@ -259,7 +318,12 @@ validation CDelHelX::ProcessFlightPlan(EuroScopePlugIn::CFlightPlan& fp, EuroSco
 	std::string assignedSquawk = cad.GetSquawk();
 	std::string currentSquawk = rt.GetPosition().GetSquawk();
 
-	if (assignedSquawk == "")
+	if (this->noChecks && assignedSquawk.empty())
+	{
+		assignedSquawk = "9999";
+	}
+
+	if (assignedSquawk.empty())
 	{
 		res.valid = false;
 		res.tag = "!ASSR";
@@ -288,7 +352,7 @@ validation CDelHelX::ProcessFlightPlan(EuroScopePlugIn::CFlightPlan& fp, EuroSco
 		return res;
 	}
 
-	if (this->radarScreen->groundOnline)
+	if (this->radarScreen->groundOnline || this->groundOverride)
 	{
 		// Bounding box coordinates for 121.775 ground frequency
 		// TL 48.129167 16.53675 // GAC top left
@@ -307,7 +371,7 @@ validation CDelHelX::ProcessFlightPlan(EuroScopePlugIn::CFlightPlan& fp, EuroSco
 			res.tag += "->121.6";
 		}
 	}
-	else if (this->radarScreen->towerOnline)
+	else if (this->radarScreen->towerOnline || this->towerOverride)
 	{
 		if (rwy=="29" || rwy =="11")
 		{
@@ -380,28 +444,9 @@ bool CDelHelX::PointInsidePolygon(int polyCorners, double polyX[], double polyY[
 	return oddNodes;
 }
 
-void CDelHelX::LogMessage(std::string message)
-{
-	this->DisplayUserMessage("Message", PLUGIN_NAME, message.c_str(), true, true, true, false, false);
-}
-
-void CDelHelX::LogMessage(std::string message, std::string type)
+void CDelHelX::LogMessage(const std::string& message, const std::string& type)
 {
 	this->DisplayUserMessage(PLUGIN_NAME, type.c_str(), message.c_str(), true, true, true, this->flashOnMessage, false);
-}
-
-void CDelHelX::LogDebugMessage(std::string message)
-{
-	if (this->debug) {
-		this->LogMessage(message);
-	}
-}
-
-void CDelHelX::LogDebugMessage(std::string message, std::string type)
-{
-	if (this->debug) {
-		this->LogMessage(message, type);
-	}
 }
 
 void CDelHelX::CheckForUpdate()

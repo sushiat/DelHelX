@@ -1,14 +1,10 @@
 #pragma once
 
 #include <string>
-#include <vector>
-#include <map>
 #include <sstream>
 #include <future>
 #include <fstream>
 #include <filesystem>
-#include <algorithm>
-#include <psapi.h>
 
 #include "EuroScope/EuroScopePlugIn.h"
 #include "semver/semver.hpp"
@@ -29,16 +25,18 @@ public:
 	CDelHelX();
 	virtual ~CDelHelX();
 
-	bool OnCompileCommand(const char* sCommandLine);
-	void OnGetTagItem(EuroScopePlugIn::CFlightPlan FlightPlan, EuroScopePlugIn::CRadarTarget RadarTarget, int ItemCode, int TagData, char sItemString[16], int* pColorCode, COLORREF* pRGB, double* pFontSize);
-	void OnFunctionCall(int FunctionId, const char* sItemString, POINT Pt, RECT Area);
-	void OnTimer(int Counter);
-	EuroScopePlugIn::CRadarScreen* OnRadarScreenCreated(const char* sDisplayName, bool NeedRadarContent, bool GeoReferenced, bool CanBeSaved, bool CanBeCreated);
+	bool OnCompileCommand(const char* sCommandLine) override;
+	void OnGetTagItem(EuroScopePlugIn::CFlightPlan FlightPlan, EuroScopePlugIn::CRadarTarget RadarTarget, int ItemCode, int TagData, char sItemString[16], int* pColorCode, COLORREF* pRGB, double* pFontSize) override;
+	void OnFunctionCall(int FunctionId, const char* sItemString, POINT Pt, RECT Area) override;
+	void OnTimer(int Counter) override;
+	EuroScopePlugIn::CRadarScreen* OnRadarScreenCreated(const char* sDisplayName, bool NeedRadarContent, bool GeoReferenced, bool CanBeSaved, bool CanBeCreated) override;
 
 private:
-	bool debug;
 	bool updateCheck;
 	bool flashOnMessage;
+	bool groundOverride;
+	bool towerOverride;
+	bool noChecks;
 	std::future<std::string> latestVersion;
 	RadarScreen* radarScreen;
 
@@ -46,14 +44,9 @@ private:
 	void SaveSettings();
 
 	validation ProcessFlightPlan(EuroScopePlugIn::CFlightPlan& fp, EuroScopePlugIn::CRadarTarget& rt);
+	static bool PointInsidePolygon(int polyCorners, double polyX[], double polyY[], double x, double y);
 
-	bool PointInsidePolygon(int polyCorners, double polyX[], double polyY[], double x, double y);
-
-	void LogMessage(std::string message);
-	void LogMessage(std::string message, std::string handler);
-	void LogDebugMessage(std::string message);
-	void LogDebugMessage(std::string message, std::string type);
-
+	void LogMessage(const std::string& message, const std::string& type);
 	void CheckForUpdate();
 };
 
