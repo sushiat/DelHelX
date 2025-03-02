@@ -2,7 +2,7 @@
 
 #include "CDelHelX.h"
 
-CDelHelX* pPlugin;
+static CDelHelX* pPlugin;
 
 CDelHelX::CDelHelX() : EuroScopePlugIn::CPlugIn(
 	EuroScopePlugIn::COMPATIBILITY_CODE,
@@ -35,9 +35,7 @@ CDelHelX::CDelHelX() : EuroScopePlugIn::CPlugIn(
 	}
 }
 
-CDelHelX::~CDelHelX()
-{
-}
+CDelHelX::~CDelHelX() = default;
 
 bool CDelHelX::OnCompileCommand(const char* sCommandLine)
 {
@@ -265,7 +263,7 @@ void CDelHelX::SaveSettings()
 	this->SaveDataToSettings(PLUGIN_NAME, "DelHelX settings", ss.str().c_str());
 }
 
-validation CDelHelX::ProcessFlightPlan(EuroScopePlugIn::CFlightPlan& fp, EuroScopePlugIn::CRadarTarget& rt)
+validation CDelHelX::ProcessFlightPlan(EuroScopePlugIn::CFlightPlan& fp, EuroScopePlugIn::CRadarTarget& rt) const
 {
 	validation res{
 		true, // valid
@@ -320,7 +318,7 @@ validation CDelHelX::ProcessFlightPlan(EuroScopePlugIn::CFlightPlan& fp, EuroSco
 
 	if (this->noChecks && assignedSquawk.empty())
 	{
-		assignedSquawk = "9999";
+		assignedSquawk = "2000";
 	}
 
 	if (assignedSquawk.empty())
@@ -362,7 +360,7 @@ validation CDelHelX::ProcessFlightPlan(EuroScopePlugIn::CFlightPlan& fp, EuroSco
 		double polyX[] = { 16.533667, 16.567444, 16.570472, 16.53675 };
 		double polyY[] = { 48.123917, 48.113056, 48.117222, 48.129167 };
 		EuroScopePlugIn::CPosition position = rt.GetPosition().GetPosition();
-		if (this->PointInsidePolygon(4, polyX, polyY, position.m_Longitude, position.m_Latitude))
+		if (CDelHelX::PointInsidePolygon(4, polyX, polyY, position.m_Longitude, position.m_Latitude))
 		{
 			res.tag += "->121.775";
 		}
