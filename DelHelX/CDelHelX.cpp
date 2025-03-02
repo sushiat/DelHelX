@@ -477,7 +477,7 @@ validation CDelHelX::ProcessFlightPlan(EuroScopePlugIn::CFlightPlan& fp, EuroSco
 	}
 	else
 	{
-		res.tag = "->122.8";
+		res.tag += "->122.8";
 	}
 
 	return res;
