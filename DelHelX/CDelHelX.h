@@ -43,8 +43,9 @@ private:
 	void LoadSettings();
 	void SaveSettings();
 
-	validation ProcessFlightPlan(EuroScopePlugIn::CFlightPlan& fp, EuroScopePlugIn::CRadarTarget& rt) const;
+	validation ProcessFlightPlan(EuroScopePlugIn::CFlightPlan& fp, EuroScopePlugIn::CRadarTarget& rt);
 	static bool PointInsidePolygon(int polyCorners, double polyX[], double polyY[], double x, double y);
+	void RedoFlags();
 
 	void LogMessage(const std::string& message, const std::string& type);
 	void CheckForUpdate();

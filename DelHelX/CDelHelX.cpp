@@ -141,9 +141,59 @@ bool CDelHelX::OnCompileCommand(const char* sCommandLine)
 
 			return true;
 		}
+		else if (args[1] == "redoflags")
+		{
+			this->LogMessage("Redoing clearance flags...", "Flags");
+			this->RedoFlags();
+
+			return true;
+		}
 	}
 
 	return false;
+}
+
+void CDelHelX::RedoFlags()
+{
+	for (EuroScopePlugIn::CRadarTarget rt = this->RadarTargetSelectFirst(); rt.IsValid(); rt = this->RadarTargetSelectNext(rt)) {
+		EuroScopePlugIn::CRadarTargetPositionData pos = rt.GetPosition();
+		// Skip auto-processing if aircraft is not on the ground (currently using ground speed threshold)
+		// TODO better option for finding aircraft on ground
+		if (!pos.IsValid() || pos.GetReportedGS() > 35) {
+			continue;
+		}
+
+		EuroScopePlugIn::CFlightPlan fp = rt.GetCorrelatedFlightPlan();
+		// Skip auto-processing if aircraft is tracked (with exception of aircraft tracked by current controller)
+		if (!fp.IsValid() || (strcmp(fp.GetTrackingControllerId(), "") != 0 && !fp.GetTrackingControllerIsMe())) {
+			continue;
+		}
+
+		std::string dep = fp.GetFlightPlanData().GetOrigin();
+		to_upper(dep);
+
+		std::string arr = fp.GetFlightPlanData().GetDestination();
+		to_upper(arr);
+
+		std::string cs = fp.GetCallsign();
+
+		// Skip auto-processing for aircraft without a valid flightplan (no departure/destination airport)
+		if (dep.empty() || arr.empty()) {
+			continue;
+		}
+
+		if (dep != "LOWW")
+		{
+			continue;
+		}
+
+		if (fp.GetClearenceFlag())
+		{
+			// Toggle off and back on
+			this->radarScreen->StartTagFunction(cs.c_str(), nullptr, 0, cs.c_str(), nullptr, EuroScopePlugIn::TAG_ITEM_FUNCTION_SET_CLEARED_FLAG, POINT(), RECT());
+			this->radarScreen->StartTagFunction(cs.c_str(), nullptr, 0, cs.c_str(), nullptr, EuroScopePlugIn::TAG_ITEM_FUNCTION_SET_CLEARED_FLAG, POINT(), RECT());
+		}
+	}
 }
 
 void CDelHelX::OnGetTagItem(EuroScopePlugIn::CFlightPlan FlightPlan, EuroScopePlugIn::CRadarTarget RadarTarget, int ItemCode, int TagData, char sItemString[16], int* pColorCode, COLORREF* pRGB, double* pFontSize)
@@ -159,15 +209,7 @@ void CDelHelX::OnGetTagItem(EuroScopePlugIn::CFlightPlan FlightPlan, EuroScopePl
 
 		if (res.valid) 
 		{
-			if (res.tag.empty()) 
-			{
-				strcpy_s(sItemString, 16, "??");
-			}
-			else
-			{
-				strcpy_s(sItemString, 16, res.tag.c_str());
-			}
-
+			strcpy_s(sItemString, 16, res.tag.c_str());
 			*pColorCode = EuroScopePlugIn::TAG_COLOR_RGB_DEFINED;
 
 			if (res.color == TAG_COLOR_NONE) 
@@ -193,29 +235,44 @@ void CDelHelX::OnGetTagItem(EuroScopePlugIn::CFlightPlan FlightPlan, EuroScopePl
 	{
 		EuroScopePlugIn::CPosition position = RadarTarget.GetPosition().GetPosition();
 
-		double polyX_bstands[] = { 16.552188, 16.554506, 16.556262, 16.553642 };
-		double polyY_bstands[] = { 48.120075, 48.119410, 48.121754, 48.122101 };
-		double polyX_estands[] = { 16.563117, 16.572832, 16.573309, 16.563665 };
-		double polyY_estands[] = { 48.116643, 48.113487, 48.114228, 48.117365 };
-		double polyX_fstands[] = { 16.569615, 16.573935, 16.572986, 16.571244 };
-		double polyY_fstands[] = { 48.116094, 48.114711, 48.117773, 48.118331 };
-		double polyX_gac_north[] = { 16.535561, 16.537167, 16.538735, 16.537153 };
-		double polyY_gac_north[] = { 48.126884, 48.126374, 48.128333, 48.128849 };
-		double polyX_gac_south[] = { 16.535321, 16.536082, 16.536605, 16.535996 };
-		double polyY_gac_south[] = { 48.125603, 48.125327, 48.126032, 48.126227 };
-		if (CDelHelX::PointInsidePolygon(4, polyX_bstands, polyY_bstands, position.m_Longitude, position.m_Latitude) ||
-			CDelHelX::PointInsidePolygon(4, polyX_estands, polyY_estands, position.m_Longitude, position.m_Latitude) ||
-			CDelHelX::PointInsidePolygon(4, polyX_fstands, polyY_fstands, position.m_Longitude, position.m_Latitude) ||
-			CDelHelX::PointInsidePolygon(4, polyX_gac_north, polyY_gac_north, position.m_Longitude, position.m_Latitude) ||
-			CDelHelX::PointInsidePolygon(4, polyX_gac_south, polyY_gac_south, position.m_Longitude, position.m_Latitude))
+		std::string groundState = FlightPlan.GetGroundState();
+		if (groundState.empty() || groundState == "STUP")
 		{
-			strcpy_s(sItemString, 16, "T");
-			*pColorCode = EuroScopePlugIn::TAG_COLOR_RGB_DEFINED;
-			*pRGB = TAG_COLOR_GREEN;
+			double polyX_bstands[] = { 16.552188, 16.554506, 16.556262, 16.553642 };
+			double polyY_bstands[] = { 48.120075, 48.119410, 48.121754, 48.122101 };
+			double polyX_estands[] = { 16.563117, 16.572832, 16.573309, 16.563665 };
+			double polyY_estands[] = { 48.116643, 48.113487, 48.114228, 48.117365 };
+			double polyX_fstands[] = { 16.569615, 16.573935, 16.572986, 16.571244 };
+			double polyY_fstands[] = { 48.116094, 48.114711, 48.117773, 48.118331 };
+			double polyX_gac_north[] = { 16.535561, 16.537167, 16.538735, 16.537153 };
+			double polyY_gac_north[] = { 48.126884, 48.126374, 48.128333, 48.128849 };
+			double polyX_gac_south[] = { 16.535321, 16.536082, 16.536605, 16.535996 };
+			double polyY_gac_south[] = { 48.125603, 48.125327, 48.126032, 48.126227 };
+			if (CDelHelX::PointInsidePolygon(4, polyX_bstands, polyY_bstands, position.m_Longitude, position.m_Latitude) ||
+				CDelHelX::PointInsidePolygon(4, polyX_estands, polyY_estands, position.m_Longitude, position.m_Latitude) ||
+				CDelHelX::PointInsidePolygon(4, polyX_fstands, polyY_fstands, position.m_Longitude, position.m_Latitude) ||
+				CDelHelX::PointInsidePolygon(4, polyX_gac_north, polyY_gac_north, position.m_Longitude, position.m_Latitude) ||
+				CDelHelX::PointInsidePolygon(4, polyX_gac_south, polyY_gac_south, position.m_Longitude, position.m_Latitude))
+			{
+				strcpy_s(sItemString, 16, "T");
+				*pColorCode = EuroScopePlugIn::TAG_COLOR_RGB_DEFINED;
+				*pRGB = TAG_COLOR_GREEN;
+			}
+			else
+			{
+				if (groundState.empty())
+				{
+					strcpy_s(sItemString, 16, "P");
+				}
+				else
+				{
+					strcpy_s(sItemString, 16, "");
+				}
+			}
 		}
 		else
 		{
-			strcpy_s(sItemString, 16, "P");
+			strcpy_s(sItemString, 16, "");
 		}
 	}
 }
@@ -322,7 +379,7 @@ void CDelHelX::SaveSettings()
 	this->SaveDataToSettings(PLUGIN_NAME, "DelHelX settings", ss.str().c_str());
 }
 
-validation CDelHelX::ProcessFlightPlan(EuroScopePlugIn::CFlightPlan& fp, EuroScopePlugIn::CRadarTarget& rt) const
+validation CDelHelX::ProcessFlightPlan(EuroScopePlugIn::CFlightPlan& fp, EuroScopePlugIn::CRadarTarget& rt)
 {
 	validation res{
 		true, // valid
@@ -330,13 +387,13 @@ validation CDelHelX::ProcessFlightPlan(EuroScopePlugIn::CFlightPlan& fp, EuroSco
 		TAG_COLOR_NONE // color
 	};
 
+	std::string cs = fp.GetCallsign();
+
 	std::string groundState = fp.GetGroundState();
 	if (!groundState.empty())
 	{
-		
+		return res;
 	}
-
-	std::string cs = fp.GetCallsign();
 
 	EuroScopePlugIn::CFlightPlanData fpd = fp.GetFlightPlanData();
 	std::string dep = fpd.GetOrigin();
