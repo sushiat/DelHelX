@@ -218,6 +218,7 @@
     <None Include="res\DelHelX.rc2" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="config.h" />
     <ClInclude Include="CDelHelX.h" />
     <ClInclude Include="constants.h" />
     <ClInclude Include="DelHelX.h" />

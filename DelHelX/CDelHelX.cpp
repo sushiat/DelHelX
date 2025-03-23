@@ -30,6 +30,7 @@ CDelHelX::CDelHelX() : EuroScopePlugIn::CPlugIn(
 	this->noChecks = false;
 
 	this->LoadSettings();
+	this->LoadConfig();
 
 	if (this->updateCheck) {
 		this->latestVersion = std::async(FetchLatestVersion);
@@ -37,6 +38,12 @@ CDelHelX::CDelHelX() : EuroScopePlugIn::CPlugIn(
 }
 
 CDelHelX::~CDelHelX() = default;
+
+EuroScopePlugIn::CRadarScreen* CDelHelX::OnRadarScreenCreated(const char* sDisplayName, bool NeedRadarContent, bool GeoReferenced, bool CanBeSaved, bool CanBeCreated)
+{
+	this->radarScreen = new RadarScreen();
+	return this->radarScreen;
+}
 
 bool CDelHelX::OnCompileCommand(const char* sCommandLine)
 {
@@ -74,10 +81,10 @@ bool CDelHelX::OnCompileCommand(const char* sCommandLine)
 		{
 			if (this->flashOnMessage) 
 			{
-				this->LogMessage("No longer flashing on DelHel message", "Config");
+				this->LogMessage("No longer flashing on DelHelX message", "Config");
 			}
 			else {
-				this->LogMessage("Flashing on DelHel message", "Config");
+				this->LogMessage("Flashing on DelHelX message", "Config");
 			}
 
 			this->flashOnMessage = !this->flashOnMessage;
@@ -157,14 +164,14 @@ void CDelHelX::RedoFlags()
 {
 	for (EuroScopePlugIn::CRadarTarget rt = this->RadarTargetSelectFirst(); rt.IsValid(); rt = this->RadarTargetSelectNext(rt)) {
 		EuroScopePlugIn::CRadarTargetPositionData pos = rt.GetPosition();
-		// Skip auto-processing if aircraft is not on the ground (currently using ground speed threshold)
-		// TODO better option for finding aircraft on ground
-		if (!pos.IsValid() || pos.GetReportedGS() > 35) {
+		// Skip if aircraft is not on the ground (currently using ground speed threshold)
+		// TODO better option for finding aircraft on ground??? maybe airport elevation via config???
+		if (!pos.IsValid() || pos.GetReportedGS() > 40) {
 			continue;
 		}
 
 		EuroScopePlugIn::CFlightPlan fp = rt.GetCorrelatedFlightPlan();
-		// Skip auto-processing if aircraft is tracked (with exception of aircraft tracked by current controller)
+		// Skip if aircraft is tracked (with exception of aircraft tracked by current controller)
 		if (!fp.IsValid() || (strcmp(fp.GetTrackingControllerId(), "") != 0 && !fp.GetTrackingControllerIsMe())) {
 			continue;
 		}
@@ -177,14 +184,16 @@ void CDelHelX::RedoFlags()
 
 		std::string cs = fp.GetCallsign();
 
-		// Skip auto-processing for aircraft without a valid flightplan (no departure/destination airport)
+		// Skip aircraft without a valid flightplan (no departure/destination airport)
 		if (dep.empty() || arr.empty()) {
 			continue;
 		}
 
-		if (dep != "LOWW")
+		auto airport = this->airports.find(dep);
+		if (airport == this->airports.end())
 		{
-			continue;
+			// Airport not in config
+			return;
 		}
 
 		if (fp.GetClearenceFlag())
@@ -205,7 +214,7 @@ void CDelHelX::OnGetTagItem(EuroScopePlugIn::CFlightPlan FlightPlan, EuroScopePl
 	
 	if (ItemCode == TAG_ITEM_PS_HELPER) 
 	{
-		validation res = this->ProcessFlightPlan(FlightPlan, RadarTarget);
+		validation res = this->CheckPushStartStatus(FlightPlan, RadarTarget);
 
 		if (res.valid) 
 		{
@@ -233,29 +242,38 @@ void CDelHelX::OnGetTagItem(EuroScopePlugIn::CFlightPlan FlightPlan, EuroScopePl
 	}
 	else if (ItemCode == TAG_ITEM_TAXIOUT)
 	{
+		EuroScopePlugIn::CFlightPlanData fpd = FlightPlan.GetFlightPlanData();
+		std::string dep = fpd.GetOrigin();
+		to_upper(dep);
+
+		auto airport = this->airports.find(dep);
+		if (airport == this->airports.end())
+		{
+			// Airport not in config
+			return;
+		}
+
 		EuroScopePlugIn::CPosition position = RadarTarget.GetPosition().GetPosition();
 
 		std::string groundState = FlightPlan.GetGroundState();
 		if (groundState.empty() || groundState == "STUP")
 		{
-			double polyX_bstands[] = { 16.552188, 16.554506, 16.556262, 16.553642 };
-			double polyY_bstands[] = { 48.120075, 48.119410, 48.121754, 48.122101 };
-			double polyX_estands[] = { 16.563117, 16.572832, 16.573309, 16.563665 };
-			double polyY_estands[] = { 48.116643, 48.113487, 48.114228, 48.117365 };
-			double polyX_fstands[] = { 16.569615, 16.573935, 16.572986, 16.571244 };
-			double polyY_fstands[] = { 48.116094, 48.114711, 48.117773, 48.118331 };
-			double polyX_hstands[] = { 16.569914, 16.571654, 16.572070, 16.570335 };
-			double polyY_hstands[] = { 48.119691, 48.119152, 48.119691, 48.120256 };
-			double polyX_gac_north[] = { 16.535561, 16.537167, 16.538735, 16.537153 };
-			double polyY_gac_north[] = { 48.126884, 48.126374, 48.128333, 48.128849 };
-			double polyX_gac_south[] = { 16.535321, 16.536082, 16.536605, 16.535996 };
-			double polyY_gac_south[] = { 48.125603, 48.125327, 48.126032, 48.126227 };
-			if (CDelHelX::PointInsidePolygon(4, polyX_bstands, polyY_bstands, position.m_Longitude, position.m_Latitude) ||
-				CDelHelX::PointInsidePolygon(4, polyX_estands, polyY_estands, position.m_Longitude, position.m_Latitude) ||
-				CDelHelX::PointInsidePolygon(4, polyX_fstands, polyY_fstands, position.m_Longitude, position.m_Latitude) ||
-				CDelHelX::PointInsidePolygon(4, polyX_hstands, polyY_hstands, position.m_Longitude, position.m_Latitude) ||
-				CDelHelX::PointInsidePolygon(4, polyX_gac_north, polyY_gac_north, position.m_Longitude, position.m_Latitude) ||
-				CDelHelX::PointInsidePolygon(4, polyX_gac_south, polyY_gac_south, position.m_Longitude, position.m_Latitude))
+			bool isTaxiOut = false;
+			for (auto& taxiOut : airport->second.taxiOutStands)
+			{
+				u_int corners = taxiOut.second.lat.size();
+				double lat[10], lon[10];
+				std::copy(taxiOut.second.lat.begin(), taxiOut.second.lat.end(), lat);
+				std::copy(taxiOut.second.lon.begin(), taxiOut.second.lon.end(), lon);
+
+				if (CDelHelX::PointInsidePolygon(static_cast<int>(corners), lon, lat, position.m_Longitude, position.m_Latitude))
+				{
+					isTaxiOut = true;
+					continue;
+				}
+			}
+
+			if (isTaxiOut)
 			{
 				strcpy_s(sItemString, 16, "T");
 				*pColorCode = EuroScopePlugIn::TAG_COLOR_RGB_DEFINED;
@@ -287,10 +305,21 @@ void CDelHelX::OnFunctionCall(int FunctionId, const char* sItemString, POINT Pt,
 		return;
 	}
 
+	EuroScopePlugIn::CFlightPlanData fpd = fp.GetFlightPlanData();
+	std::string dep = fpd.GetOrigin();
+	to_upper(dep);
+
+	auto airport = this->airports.find(dep);
+	if (airport == this->airports.end())
+	{
+		// Airport not in config
+		return;
+	}
+
 	EuroScopePlugIn::CRadarTarget rt = fp.GetCorrelatedRadarTarget();
 
 	if (FunctionId == TAG_FUNC_ON_FREQ) {
-		validation res = this->ProcessFlightPlan(fp, rt);
+		validation res = this->CheckPushStartStatus(fp, rt);
 		if (res.valid)
 		{
 			// Are we ground or higher?
@@ -298,24 +327,22 @@ void CDelHelX::OnFunctionCall(int FunctionId, const char* sItemString, POINT Pt,
 			{
 				EuroScopePlugIn::CPosition position = rt.GetPosition().GetPosition();
 
-				double polyX_bstands[] = { 16.552188, 16.554506, 16.556262, 16.553642 };
-				double polyY_bstands[] = { 48.120075, 48.119410, 48.121754, 48.122101 };
-				double polyX_estands[] = { 16.563117, 16.572832, 16.573309, 16.563665 };
-				double polyY_estands[] = { 48.116643, 48.113487, 48.114228, 48.117365 };
-				double polyX_fstands[] = { 16.569615, 16.573935, 16.572986, 16.571244 };
-				double polyY_fstands[] = { 48.116094, 48.114711, 48.117773, 48.118331 };
-				double polyX_hstands[] = { 16.569914, 16.571654, 16.572070, 16.570335 };
-				double polyY_hstands[] = { 48.119691, 48.119152, 48.119691, 48.120256 };
-				double polyX_gac_north[] = { 16.535561, 16.537167, 16.538735, 16.537153 };
-				double polyY_gac_north[] = { 48.126884, 48.126374, 48.128333, 48.128849 };
-				double polyX_gac_south[] = { 16.535321, 16.536082, 16.536605, 16.535996 };
-				double polyY_gac_south[] = { 48.125603, 48.125327, 48.126032, 48.126227 };
-				if (CDelHelX::PointInsidePolygon(4, polyX_bstands, polyY_bstands, position.m_Longitude, position.m_Latitude) ||
-					CDelHelX::PointInsidePolygon(4, polyX_estands, polyY_estands, position.m_Longitude, position.m_Latitude) ||
-					CDelHelX::PointInsidePolygon(4, polyX_fstands, polyY_fstands, position.m_Longitude, position.m_Latitude) ||
-					CDelHelX::PointInsidePolygon(4, polyX_hstands, polyY_hstands, position.m_Longitude, position.m_Latitude) ||
-					CDelHelX::PointInsidePolygon(4, polyX_gac_north, polyY_gac_north, position.m_Longitude, position.m_Latitude) ||
-					CDelHelX::PointInsidePolygon(4, polyX_gac_south, polyY_gac_south, position.m_Longitude, position.m_Latitude))
+				bool isTaxiOut = false;
+				for (auto& taxiOut : airport->second.taxiOutStands)
+				{
+					u_int corners = taxiOut.second.lat.size();
+					double lat[10], lon[10];
+					std::copy(taxiOut.second.lat.begin(), taxiOut.second.lat.end(), lat);
+					std::copy(taxiOut.second.lon.begin(), taxiOut.second.lon.end(), lon);
+
+					if (CDelHelX::PointInsidePolygon(static_cast<int>(corners), lon, lat, position.m_Longitude, position.m_Latitude))
+					{
+						isTaxiOut = true;
+						continue;
+					}
+				}
+
+				if (isTaxiOut)
 				{
 					std::string scratchBackup(fp.GetControllerAssignedData().GetScratchPadString());
 					fp.GetControllerAssignedData().SetScratchPadString("ST-UP");
@@ -323,8 +350,9 @@ void CDelHelX::OnFunctionCall(int FunctionId, const char* sItemString, POINT Pt,
 				}
 				else
 				{
+					// We could give PUSH here, but it's better to visually check, so let's just "pop" it up using ONFREQ
 					std::string scratchBackup(fp.GetControllerAssignedData().GetScratchPadString());
-					fp.GetControllerAssignedData().SetScratchPadString("PUSH");
+					fp.GetControllerAssignedData().SetScratchPadString("ONFREQ");
 					fp.GetControllerAssignedData().SetScratchPadString(scratchBackup.c_str());
 				}
 			}
@@ -339,17 +367,190 @@ void CDelHelX::OnFunctionCall(int FunctionId, const char* sItemString, POINT Pt,
 	}
 }
 
-void CDelHelX::OnTimer(int Counter)
+validation CDelHelX::CheckPushStartStatus(EuroScopePlugIn::CFlightPlan& fp, EuroScopePlugIn::CRadarTarget& rt)
 {
-	if (this->updateCheck && this->latestVersion.valid() && this->latestVersion.wait_for(0ms) == std::future_status::ready) {
-		this->CheckForUpdate();
+	validation res{
+		true, // valid
+		"", // tag
+		TAG_COLOR_NONE // color
+	};
+
+	std::string cs = fp.GetCallsign();
+
+	std::string groundState = fp.GetGroundState();
+	if (!groundState.empty())
+	{
+		return res;
 	}
+
+	EuroScopePlugIn::CFlightPlanData fpd = fp.GetFlightPlanData();
+	std::string dep = fpd.GetOrigin();
+	to_upper(dep);
+
+	auto airport = this->airports.find(dep);
+	if (airport == this->airports.end())
+	{
+		// Airport not in config, so ignore it
+		return res;
+	}
+
+	std::string rwy = fpd.GetDepartureRwy();
+	if (!this->noChecks && rwy.empty())
+	{
+		res.valid = false;
+		res.tag = "!RWY";
+		res.color = TAG_COLOR_RED;
+
+		return res;
+	}
+
+	EuroScopePlugIn::CFlightPlanControllerAssignedData cad = fp.GetControllerAssignedData();
+	std::string assignedSquawk = cad.GetSquawk();
+	std::string currentSquawk = rt.GetPosition().GetSquawk();
+
+	if (this->noChecks && assignedSquawk.empty())
+	{
+		assignedSquawk = "2000";
+	}
+
+	if (assignedSquawk.empty())
+	{
+		res.valid = false;
+		res.tag = "!ASSR";
+		res.color = TAG_COLOR_RED;
+
+		return res;
+	}
+
+	bool clearanceFlag = fp.GetClearenceFlag();
+	if (!this->noChecks && !clearanceFlag)
+	{
+		res.valid = false;
+		res.tag = "!CLR";
+		res.color = TAG_COLOR_RED;
+
+		return res;
+	}
+
+	if (assignedSquawk != currentSquawk)
+	{
+		res.tag = assignedSquawk;
+		res.color = TAG_COLOR_ORANGE;
+	}
+
+	EuroScopePlugIn::CController me = this->ControllerMyself();
+	if (me.IsController() && me.GetRating()>1 && me.GetFacility() >= 3)
+	{
+		if (res.tag.empty())
+		{
+			res.tag = "OK";
+		} else
+		{
+			res.tag += "->OK";
+		}
+
+		return res;
+	}
+
+	bool groundOnline = false;
+	for (auto station : this->radarScreen->groundStations)
+	{
+		if (station.find(dep) != std::string::npos)
+		{
+			groundOnline = true;
+			continue;
+		}
+	}
+
+	if (groundOnline || this->groundOverride)
+	{
+		EuroScopePlugIn::CPosition position = rt.GetPosition().GetPosition();
+		for (auto& geoGnd : airport->second.geoGndFreq)
+		{
+			u_int corners = geoGnd.second.lat.size();
+			double lat[10], lon[10];
+			std::copy(geoGnd.second.lat.begin(), geoGnd.second.lat.end(), lat);
+			std::copy(geoGnd.second.lon.begin(), geoGnd.second.lon.end(), lon);
+
+			if (CDelHelX::PointInsidePolygon(static_cast<int>(corners), lon, lat, position.m_Longitude, position.m_Latitude))
+			{
+				res.tag += "->" + geoGnd.second.freq;
+				return res;
+			}
+		}
+
+		// Didn't find any geo-based GND, so return default
+		res.tag += "->" + airport->second.gndFreq;
+		return res;
+	}
+
+	bool towerOnline = false;
+	for (auto station : this->radarScreen->towerStations)
+	{
+		if (station.find(dep) != std::string::npos)
+		{
+			towerOnline = true;
+			continue;
+		}
+	}
+
+	if (towerOnline || this->towerOverride)
+	{
+		for (auto rwyFreq : airport->second.rwyTwrFreq)
+		{
+			if (rwy == rwyFreq.first)
+			{
+				res.tag += "->" + rwyFreq.second;
+				return res;
+			}
+		}
+
+		// Didn't find a runway specific tower, so return default
+		res.tag += "->" + airport->second.twrFreq;
+		return res;
+	}
+
+	for (auto station : this->radarScreen->approachStations)
+	{
+		if (station.find(dep) != std::string::npos)
+		{
+			res.tag += "->" + airport->second.appFreq;
+			return res;
+		}
+	}
+
+	for (auto center : airport->second.ctrStations)
+	{
+		for (auto station : this->radarScreen->centerStations)
+		{
+			if (station.first.find(center) != std::string::npos)
+			{
+				res.tag += "->" + station.second;
+				return res;
+			}
+		}
+	}
+
+	// Nothing online, UNICOM
+	res.tag += "->122.8";
+	return res;
 }
 
-EuroScopePlugIn::CRadarScreen* CDelHelX::OnRadarScreenCreated(const char* sDisplayName, bool NeedRadarContent, bool GeoReferenced, bool CanBeSaved, bool CanBeCreated)
-{
-	this->radarScreen = new RadarScreen();
-	return this->radarScreen;
+bool CDelHelX::PointInsidePolygon(int polyCorners, double polyX[], double polyY[], double x, double y) {
+	int   i, j = polyCorners - 1;
+	bool  oddNodes = false;
+
+	for (i = 0; i < polyCorners; i++) {
+		if (polyY[i] < y && polyY[j] >= y
+			|| polyY[j] < y && polyY[i] >= y) {
+			if (polyX[i] + (y - polyY[i]) / (polyY[j] - polyY[i]) * (polyX[j] - polyX[i]) < x) {
+				oddNodes = !oddNodes;
+			}
+		}
+		j = i;
+	}
+
+	return oddNodes;
 }
 
 void CDelHelX::LoadSettings()
@@ -385,188 +586,172 @@ void CDelHelX::SaveSettings()
 	this->SaveDataToSettings(PLUGIN_NAME, "DelHelX settings", ss.str().c_str());
 }
 
-validation CDelHelX::ProcessFlightPlan(EuroScopePlugIn::CFlightPlan& fp, EuroScopePlugIn::CRadarTarget& rt)
+void CDelHelX::LoadConfig()
 {
-	validation res{
-		true, // valid
-		"", // tag
-		TAG_COLOR_NONE // color
-	};
-
-	std::string cs = fp.GetCallsign();
-
-	std::string groundState = fp.GetGroundState();
-	if (!groundState.empty())
+	json config;
+	try 
 	{
-		return res;
+		std::filesystem::path base(GetPluginDirectory());
+		base.append("config.json");
+
+		std::ifstream ifs(base.c_str());
+
+		config = json::parse(ifs);
+	}
+	catch (std::exception e)
+	{
+		this->LogMessage("Failed to read config. Error: " + std::string(e.what()), "Config");
+		return;
 	}
 
-	EuroScopePlugIn::CFlightPlanData fpd = fp.GetFlightPlanData();
-	std::string dep = fpd.GetOrigin();
-	to_upper(dep);
-
-	if (!this->noChecks && strcmp(dep.c_str(), "LOWW") != 0)
+	for (auto& [icao, json_airport] : config.items())
 	{
-		res.valid = false;
-		res.tag = "ADEP";
-		res.color = TAG_COLOR_RED;
+		// Get basic airport attributes
+		airport ap {
+			icao,
+			json_airport.value<std::string>("gndFreq", ""),
+			json_airport.value<std::string>("twrFreq", ""),
+			json_airport.value<std::string>("appFreq", "")
+		};
 
-		return res;
+		auto ctrStations{ json_airport["ctrStations"].get<std::vector<std::string>>() };
+		ap.ctrStations = ctrStations;
+
+		json json_geoGnds;
+		try 
+		{
+			json_geoGnds = json_airport.at("geoGndFreq");
+		}
+		catch (std::exception e)
+		{
+			this->LogMessage("Failed to get geographic ground frequencies for airport \"" + icao + "\". Error: " + std::string(e.what()), "Config");
+			continue;
+		}
+
+		for (auto& [name, json_geoGnd] : json_geoGnds.items())
+		{
+			geoGndFreq ggf {
+				name,
+				json_geoGnd.value<std::string>("freq", "")
+			};
+
+			auto lat{ json_geoGnd["lat"].get<std::vector<double>>() };
+			auto lon{ json_geoGnd["lon"].get<std::vector<double>>() };
+			ggf.lat = lat;
+			ggf.lon = lon;
+
+			ap.geoGndFreq.emplace(name, ggf);
+		}
+
+		json json_rwyTwrs;
+		try 
+		{
+			json_rwyTwrs = json_airport.at("rwyTwrFreq");
+		}
+		catch (std::exception e)
+		{
+			this->LogMessage("Failed to get runway tower frequencies for airport \"" + icao + "\". Error: " + std::string(e.what()), "Config");
+			continue;
+		}
+
+		for (auto& [rwyid, json_rwy] : json_rwyTwrs.items())
+		{
+			auto rwyFreq = json_rwy.value<std::string>("freq", "");
+			ap.rwyTwrFreq.emplace(rwyid, rwyFreq);
+		}
+
+		json json_taxiouts;
+		try 
+		{
+			json_taxiouts = json_airport.at("taxiOutStands");
+		}
+		catch (std::exception e)
+		{
+			this->LogMessage("Failed to get taxi out stands for airport \"" + icao + "\". Error: " + std::string(e.what()), "Config");
+			continue;
+		}
+
+		for (auto& [name, json_taxiout] : json_taxiouts.items())
+		{
+			taxiOutStands tos {
+				name
+			};
+
+			auto lat{ json_taxiout["lat"].get<std::vector<double>>() };
+			auto lon{ json_taxiout["lon"].get<std::vector<double>>() };
+			tos.lat = lat;
+			tos.lon = lon;
+
+			ap.taxiOutStands.emplace(name, tos);
+		}
+
+		this->airports.emplace(icao, ap);
 	}
 
-	bool clearanceFlag = fp.GetClearenceFlag();
-	if (!this->noChecks && !clearanceFlag)
+	this->LogMessage("Successfully loaded config for " + std::to_string(this->airports.size()) + " airport(s).", "Config");
+	for (auto& airport : this->airports)
 	{
-		res.valid = false;
-		res.tag = "!CLR";
-		res.color = TAG_COLOR_RED;
-
-		return res;
+		this->LogMessage("Airport: " + airport.first, "Config");
+		this->LogMessage("--> GND: " + airport.second.gndFreq, "Config");
+		this->LogMessage("--> TWR: " + airport.second.twrFreq, "Config");
+		this->LogMessage("--> APP: " + airport.second.appFreq, "Config");
+		int ctrIndex = 0;
+		for (auto ctr : airport.second.ctrStations)
+		{
+			this->LogMessage("--> CTR[" + std::to_string(ctrIndex) + "]: " + ctr, "Config");
+			ctrIndex++;
+		}
+		for (auto& geoGnd : airport.second.geoGndFreq)
+		{
+			this->LogMessage("--> GeoGnd " + geoGnd.first, "Config");
+			this->LogMessage("----> FRQ: " + geoGnd.second.freq, "Config");
+			std::string lat_string = std::accumulate(std::begin(geoGnd.second.lat), std::end(geoGnd.second.lat), std::string(),
+				[](std::string& ss, double s)
+				{
+					return ss.empty() ? std::to_string(s) : ss + ", " + std::to_string(s);
+				});
+			this->LogMessage("----> LAT: " + lat_string, "Config");
+			std::string lon_string = std::accumulate(std::begin(geoGnd.second.lon), std::end(geoGnd.second.lon), std::string(),
+				[](std::string& ss, double s)
+				{
+					return ss.empty() ? std::to_string(s) : ss + ", " + std::to_string(s);
+				});
+			this->LogMessage("----> LON: " + lon_string, "Config");
+		}
+		for (auto& twrRwy : airport.second.rwyTwrFreq)
+		{
+			this->LogMessage("--> TWR[" + twrRwy.first + "]: " + twrRwy.second, "Config");
+		}
+		for (auto& taxiOut : airport.second.taxiOutStands)
+		{
+			this->LogMessage("--> TaxiOut " + taxiOut.first, "Config");
+			std::string lat_string = std::accumulate(std::begin(taxiOut.second.lat), std::end(taxiOut.second.lat), std::string(),
+				[](std::string& ss, double s)
+				{
+					return ss.empty() ? std::to_string(s) : ss + ", " + std::to_string(s);
+				});
+			this->LogMessage("----> LAT: " + lat_string, "Config");
+			std::string lon_string = std::accumulate(std::begin(taxiOut.second.lon), std::end(taxiOut.second.lon), std::string(),
+				[](std::string& ss, double s)
+				{
+					return ss.empty() ? std::to_string(s) : ss + ", " + std::to_string(s);
+				});
+			this->LogMessage("----> LON: " + lon_string, "Config");
+		}
 	}
 	
-	std::string rwy = fpd.GetDepartureRwy();
-	if (!this->noChecks && rwy.empty())
-	{
-		res.valid = false;
-		res.tag = "!RWY";
-		res.color = TAG_COLOR_RED;
-
-		return res;
-	}
-
-	EuroScopePlugIn::CFlightPlanControllerAssignedData cad = fp.GetControllerAssignedData();
-	std::string assignedSquawk = cad.GetSquawk();
-	std::string currentSquawk = rt.GetPosition().GetSquawk();
-
-	if (this->noChecks && assignedSquawk.empty())
-	{
-		assignedSquawk = "2000";
-	}
-
-	if (assignedSquawk.empty())
-	{
-		res.valid = false;
-		res.tag = "!ASSR";
-		res.color = TAG_COLOR_RED;
-
-		return res;
-	}
-
-	if (assignedSquawk != currentSquawk)
-	{
-		res.tag = assignedSquawk;
-		res.color = TAG_COLOR_ORANGE;
-	}
-
-	EuroScopePlugIn::CController me = this->ControllerMyself();
-	if (me.IsController() && me.GetRating()>1 && me.GetFacility() >= 3)
-	{
-		if (res.tag.empty())
-		{
-			res.tag = "OK";
-		} else
-		{
-			res.tag += "->OK";
-		}
-
-		return res;
-	}
-
-	if (this->radarScreen->groundOnline || this->groundOverride)
-	{
-		// Bounding box coordinates for 121.775 ground frequency
-		// BL 48.123917 16.533667 // HP Rwy 11 bottom left
-		// BR 48.113056 16.567444 // HP Rwy 29 (A4) bottom right
-		// TR 48.117222 16.570472 // Terminal 2 top right
-		// TL 48.129167 16.53675 // GAC top left
-		double polyX[] = { 16.533667, 16.567444, 16.570472, 16.53675 };
-		double polyY[] = { 48.123917, 48.113056, 48.117222, 48.129167 };
-		EuroScopePlugIn::CPosition position = rt.GetPosition().GetPosition();
-		if (CDelHelX::PointInsidePolygon(4, polyX, polyY, position.m_Longitude, position.m_Latitude))
-		{
-			res.tag += "->121.775";
-		}
-		else
-		{
-			res.tag += "->121.6";
-		}
-	}
-	else if (this->radarScreen->towerOnline || this->towerOverride)
-	{
-		if (rwy=="29" || rwy =="11")
-		{
-			res.tag += "->119.4";
-		}
-		else
-		{
-			res.tag += "->123.8";
-		}
-	}
-	else if (this->radarScreen->approachOnline)
-	{
-		res.tag += "->134.675";
-	}
-	else if (this->radarScreen->eastCenterOnline && this->radarScreen->eastCenterFreq > 0)
-	{
-		std::ostringstream strs;
-		strs << this->radarScreen->eastCenterFreq;
-		std::string str = strs.str();
-
-		res.tag += "->" + str;
-	}
-	else if (this->radarScreen->northCenterOnline && this->radarScreen->northCenterFreq > 0)
-	{
-		std::ostringstream strs;
-		strs << this->radarScreen->northCenterFreq;
-		std::string str = strs.str();
-
-		res.tag += "->" + str;
-	}
-	else if (this->radarScreen->centerOnline && this->radarScreen->centerFreq > 0)
-	{
-		std::ostringstream strs;
-		strs << this->radarScreen->centerFreq;
-		std::string str = strs.str();
-
-		res.tag += "->" + str;
-	}
-	else if (this->radarScreen->centralCenterOnline && this->radarScreen->centralCenterFreq > 0)
-	{
-		std::ostringstream strs;
-		strs << this->radarScreen->centralCenterFreq;
-		std::string str = strs.str();
-
-		res.tag += "->" + str;
-	}
-	else
-	{
-		res.tag += "->122.8";
-	}
-
-	return res;
-}
-
-
-bool CDelHelX::PointInsidePolygon(int polyCorners, double polyX[], double polyY[], double x, double y) {
-	int   i, j = polyCorners - 1;
-	bool  oddNodes = false;
-
-	for (i = 0; i < polyCorners; i++) {
-		if (polyY[i] < y && polyY[j] >= y
-			|| polyY[j] < y && polyY[i] >= y) {
-			if (polyX[i] + (y - polyY[i]) / (polyY[j] - polyY[i]) * (polyX[j] - polyX[i]) < x) {
-				oddNodes = !oddNodes;
-			}
-		}
-		j = i;
-	}
-
-	return oddNodes;
 }
 
 void CDelHelX::LogMessage(const std::string& message, const std::string& type)
 {
 	this->DisplayUserMessage(PLUGIN_NAME, type.c_str(), message.c_str(), true, true, true, this->flashOnMessage, false);
+}
+
+void CDelHelX::OnTimer(int Counter)
+{
+	if (this->updateCheck && this->latestVersion.valid() && this->latestVersion.wait_for(0ms) == std::future_status::ready) {
+		this->CheckForUpdate();
+	}
 }
 
 void CDelHelX::CheckForUpdate()

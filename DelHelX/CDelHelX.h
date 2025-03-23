@@ -15,6 +15,7 @@
 #include "validation.h"
 #include "RadarScreen.h"
 #include "point.h"
+#include "config.h"
 
 using json = nlohmann::json;
 using namespace std::chrono_literals;
@@ -39,11 +40,13 @@ private:
 	bool noChecks;
 	std::future<std::string> latestVersion;
 	RadarScreen* radarScreen;
+	std::map<std::string, airport> airports;
 
 	void LoadSettings();
 	void SaveSettings();
+	void LoadConfig();
 
-	validation ProcessFlightPlan(EuroScopePlugIn::CFlightPlan& fp, EuroScopePlugIn::CRadarTarget& rt);
+	validation CheckPushStartStatus(EuroScopePlugIn::CFlightPlan& fp, EuroScopePlugIn::CRadarTarget& rt);
 	static bool PointInsidePolygon(int polyCorners, double polyX[], double polyY[], double x, double y);
 	void RedoFlags();
 
