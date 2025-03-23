@@ -1,24 +1,20 @@
 {
   "LOWW": {
-    "gndFreq": {
-	  "geo": {
-	    "west": {
+	"gndFreq": "121.6",
+    "geoGndFreq": {
+		"west": {
+		  "freq": "121.775",
 		  "lat": [ 48.123917, 48.113056, 48.117222, 48.129167 ],
-		  "lon": [ 16.533667, 16.567444, 16.570472, 16.536750 ],
-		  "freq": "121.775"
+		  "lon": [ 16.533667, 16.567444, 16.570472, 16.536750 ]
 		}
-	  },
-	  "default": "121.6"
 	},
-	"twrFreq": {
-		"rwy": {
-			"11": "119.4",
-			"29": "119.4"
-		},
-		"default": "123.8"
+	"twrFreq": "123.8",
+	"rwyTwrFreq": {
+		"11": { "freq": "119.4" },
+		"29": { "freq": "119.4" }
 	},
 	"appFreq": "134.675",
-	"ctrFreq": [ "LOVV_E", "LOVV_N", "LOVV_CTR", "LOVV_C_" ],
+	"ctrStations": [ "LOVV_E", "LOVV_N", "LOVV_CTR", "LOVV_C_" ],
 	"taxiOutStands": {
 		"bstands": {
 			"lat": [ 48.120075, 48.119410, 48.121754, 48.122101 ],
