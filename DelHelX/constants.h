@@ -13,8 +13,10 @@ const char SETTINGS_DELIMITER = '|';
 
 const int TAG_ITEM_PS_HELPER = 1;
 const int TAG_ITEM_TAXIOUT = 2;
+const int TAG_ITEM_NEWQNH = 3;
 
 const int TAG_FUNC_ON_FREQ = 100;
+const int TAG_FUNC_CLEAR_NEWQNH = 101;
 
 const COLORREF TAG_COLOR_NONE = 0;
 const COLORREF TAG_COLOR_RED = RGB(200, 0, 0);

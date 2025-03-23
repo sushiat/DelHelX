@@ -20,6 +20,8 @@ CDelHelX::CDelHelX() : EuroScopePlugIn::CPlugIn(
 	this->RegisterTagItemType("Push+Start Helper", TAG_ITEM_PS_HELPER);
 	this->RegisterTagItemType("Taxi out?", TAG_ITEM_TAXIOUT);
 	this->RegisterTagItemFunction("Set ONFREQ/STUP/PUSH", TAG_FUNC_ON_FREQ);
+	this->RegisterTagItemType("New QNH", TAG_ITEM_NEWQNH);
+	this->RegisterTagItemFunction("Clear new QNH", TAG_FUNC_CLEAR_NEWQNH);
 
 	this->RegisterDisplayType(PLUGIN_NAME, true, false, false, false);
 
@@ -152,6 +154,12 @@ bool CDelHelX::OnCompileCommand(const char* sCommandLine)
 		{
 			this->LogMessage("Redoing clearance flags...", "Flags");
 			this->RedoFlags();
+
+			return true;
+		}
+		else if (args[1] == "testqnh")
+		{
+			this->OnNewMetarReceived("LOWW", "LOWW 231805Z 26011KT CAVOK 15/07 Q2000 TEMPO 32015KT");
 
 			return true;
 		}
@@ -296,6 +304,21 @@ void CDelHelX::OnGetTagItem(EuroScopePlugIn::CFlightPlan FlightPlan, EuroScopePl
 			strcpy_s(sItemString, 16, "");
 		}
 	}
+	else if (ItemCode == TAG_ITEM_NEWQNH)
+	{
+		EuroScopePlugIn::CFlightPlanControllerAssignedData fpcad = FlightPlan.GetControllerAssignedData();
+		std::string annotation = fpcad.GetFlightStripAnnotation(8);
+		if (annotation=="NQNH")
+		{
+			strcpy_s(sItemString, 16, "X");
+			*pColorCode = EuroScopePlugIn::TAG_COLOR_RGB_DEFINED;
+			*pRGB = TAG_COLOR_ORANGE;
+		}
+		else
+		{
+			strcpy_s(sItemString, 16, "");
+		}
+	}
 }
 
 void CDelHelX::OnFunctionCall(int FunctionId, const char* sItemString, POINT Pt, RECT Area)
@@ -364,6 +387,11 @@ void CDelHelX::OnFunctionCall(int FunctionId, const char* sItemString, POINT Pt,
 				fp.GetControllerAssignedData().SetScratchPadString(scratchBackup.c_str());
 			}
 		}
+	}
+	else if (FunctionId == TAG_FUNC_CLEAR_NEWQNH)
+	{
+		EuroScopePlugIn::CFlightPlanControllerAssignedData fpcad = fp.GetControllerAssignedData();
+		fpcad.SetFlightStripAnnotation(8, "");
 	}
 }
 
@@ -751,6 +779,77 @@ void CDelHelX::OnTimer(int Counter)
 {
 	if (this->updateCheck && this->latestVersion.valid() && this->latestVersion.wait_for(0ms) == std::future_status::ready) {
 		this->CheckForUpdate();
+	}
+}
+
+void CDelHelX::OnNewMetarReceived(const char* sStation, const char* sFullMetar)
+{
+	std::string station = sStation;
+	to_upper(station);
+
+	this->LogMessage("New METAR for station " + station + ": " + sFullMetar, "Metar");
+
+	auto airport = this->airports.find(station);
+	if (airport == this->airports.end())
+	{
+		// Station not in airport config, so ignore it
+		return;
+	}
+
+	std::vector<std::string> metarElements = split(sFullMetar);
+	for (std::string metarElement : metarElements)
+	{
+		static const std::regex qnh(R"(Q[0-9]{4})");
+		static const std::regex alt(R"(A[0-9]{4})");
+
+		if (std::regex_match(metarElement, qnh) || std::regex_match(metarElement, alt))
+		{
+			// Check if existing QNH and if that is now different
+			auto existingQNH = this->airportQNH.find(station);
+			if (existingQNH == this->airportQNH.end())
+			{
+				this->LogMessage("First QNH value for airport " + station + " is " + metarElement, "Metar");
+
+				// No existing QNH, add it
+				this->airportQNH.emplace(station, metarElement);
+			}
+			else
+			{
+				if (existingQNH->second != metarElement)
+				{
+					this->LogMessage("New QNH value for airport " + station + " is " + metarElement, "Metar");
+
+					// Save new QNH
+					this->airportQNH[station] = metarElement;
+
+					// Set flight strip annotation on aircraft on the ground at that airport
+					for (EuroScopePlugIn::CRadarTarget rt = this->RadarTargetSelectFirst(); rt.IsValid(); rt = this->RadarTargetSelectNext(rt)) {
+						EuroScopePlugIn::CRadarTargetPositionData pos = rt.GetPosition();
+
+						// Skip aircraft is not on the ground
+						// TODO better option for finding aircraft on ground??? maybe airport elevation via config???
+						if (!pos.IsValid() || pos.GetReportedGS() > 40) {
+							continue;
+						}
+
+						EuroScopePlugIn::CFlightPlan fp = rt.GetCorrelatedFlightPlan();
+						// Skip aircraft is tracked (with exception of aircraft tracked by current controller)
+						if (!fp.IsValid() || (strcmp(fp.GetTrackingControllerId(), "") != 0 && !fp.GetTrackingControllerIsMe())) {
+							continue;
+						}
+
+						std::string dep = fp.GetFlightPlanData().GetOrigin();
+						to_upper(dep);
+
+						if (dep == station && fp.GetClearenceFlag())
+						{
+							EuroScopePlugIn::CFlightPlanControllerAssignedData fpcad = fp.GetControllerAssignedData();
+							fpcad.SetFlightStripAnnotation(8, "NQNH");
+						}
+					}
+				}
+			}
+		}
 	}
 }
 
