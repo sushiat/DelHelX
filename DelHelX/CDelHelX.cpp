@@ -56,7 +56,7 @@ bool CDelHelX::OnCompileCommand(const char* sCommandLine)
 		if (args.size() == 1) 
 		{
 			std::ostringstream msg;
-			msg << "Version " << PLUGIN_VERSION << " loaded. Available commands: gnd, twr, nocheck, reset, update, flash";
+			msg << "Version " << PLUGIN_VERSION << " loaded. Available commands: gnd, twr, nocheck, reset, update, flash, redoflags, testqnh";
 
 			this->LogMessage(msg.str(), "Init");
 
@@ -307,7 +307,7 @@ void CDelHelX::OnGetTagItem(EuroScopePlugIn::CFlightPlan FlightPlan, EuroScopePl
 	else if (ItemCode == TAG_ITEM_NEWQNH)
 	{
 		EuroScopePlugIn::CFlightPlanControllerAssignedData fpcad = FlightPlan.GetControllerAssignedData();
-		std::string annotation = fpcad.GetFlightStripAnnotation(8);
+		std::string annotation = fpcad.GetFlightStripAnnotation(2);
 		if (annotation=="NQNH")
 		{
 			strcpy_s(sItemString, 16, "X");
@@ -391,7 +391,7 @@ void CDelHelX::OnFunctionCall(int FunctionId, const char* sItemString, POINT Pt,
 	else if (FunctionId == TAG_FUNC_CLEAR_NEWQNH)
 	{
 		EuroScopePlugIn::CFlightPlanControllerAssignedData fpcad = fp.GetControllerAssignedData();
-		fpcad.SetFlightStripAnnotation(8, "");
+		fpcad.SetFlightStripAnnotation(2, "");
 	}
 }
 
@@ -844,7 +844,7 @@ void CDelHelX::OnNewMetarReceived(const char* sStation, const char* sFullMetar)
 						if (dep == station && fp.GetClearenceFlag())
 						{
 							EuroScopePlugIn::CFlightPlanControllerAssignedData fpcad = fp.GetControllerAssignedData();
-							fpcad.SetFlightStripAnnotation(8, "NQNH");
+							fpcad.SetFlightStripAnnotation(2, "NQNH");
 						}
 					}
 				}
