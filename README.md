@@ -7,11 +7,8 @@
 -   [Getting started](#getting-started)
     -   [Prerequisites](#prerequisites)
     -   [Installation](#installation)
--   [Usage](#usage)
-    -   [Basics](#basics)
-    -   [Tag items](#tag-items)
-    -   [Tag functions](#tag-functions)
-    -   [Chat commands](#chat-commands)
+-   [Push+Start indications](#pushstart-indications)
+-   [Chat commands](#chat-commands)
 -   [Contributing](#contributing)
     -   [Development setup](#development-setup)
 -   [License](#license)
@@ -23,8 +20,6 @@
 Since `DelHelX` was developed as an EuroScope plugin, it requires a working installation [EuroScope](https://euroscope.hu/). The initial development was started using EuroScope version [`v3.2.9`](https://www.euroscope.hu/wp/2020/06/28/v3-2-1-25/), although the plugin should most likely also work fine with previous and later versions. It has been tested and confirmed working with version 3.2.3. As development continues, compatibility to the latest **beta** versions of EuroScope will be maintained as long as possible and feasible.
 
 ### Installation
-
-TODO update screenshots
 
 1. Download the latest release (`DelHelX.zip`) of `DelHelX` from the [**Releases**](https://github.com/sushiat/DelHelX/releases/latest) section of this repository
 2. Extract `DelHelX.dll` and `config.json` and place both into your plugin directory (most likely somewhere inside your EuroScope sectorfile/profile setup, where other plugins are already set up)
@@ -75,15 +70,7 @@ The aircraft is cleared and ready but the current controller doesn't have the pe
 
 ## Chat commands
 
-Chat commands allow more fine-grained control of `DelHelX`'s behavior and settings not available via UI elements. Every chat command is prefixed with `.delhelx` and can be entered in every chat channel available. Executing `.delhel` without any additional commands prints the version loaded and a list of commands available.
-
-#### Toggle debug logging
-
-`.delhelx debug`
-
-Toggles debug logging, displaying more messages about the internal state and flightplan processing.
-
-This setting will be saved to the EuroScope settings upon exit.
+Chat commands allow more fine-grained control of `DelHelX`'s behavior and some convinience functions not available via UI elements. Every chat command is prefixed with `.delhelx` and can be entered in every chat channel available. Executing `.delhelx` without any additional commands prints the version loaded and a list of commands available.
 
 #### Toggle update checks
 
@@ -96,16 +83,53 @@ If enabled, `DelHelX` will check this repository for newer releases of the plugi
 This setting will be saved to the EuroScope settings upon exit.
 
 
-#### Toggle flashing of DelHel messages
+#### Toggle flashing of DelHelX messages
 
 `.delhelx flash`
 
-Toggles flashing of unread message indicator for messages in the DelHel group. Note that, once disabled, all `DelHelX` messages will continue to flash until you have restarted EuroScope (saving your plugin settings). This unfortunately seems to be a EuroScope limitation we cannot work around.
-
-If enabled, messages sent to the `DelHelX` group will have a flashing unread indiciator.  
-If disabled (default setting), unread messages will only light up once, solidly (only applies after EuroScope has been restarted).
+Toggles flashing of unread message indicator for messages in the DelHelX group. Note that, once disabled, all `DelHelX` messages will continue to flash until you have restarted EuroScope (saving your plugin settings). This unfortunately seems to be a EuroScope limitation we cannot work around.
 
 This setting will be saved to the EuroScope settings upon exit.
+
+#### GND override
+
+`.delhelx gnd`
+
+Toggles ground "online" override. This forces DelHelX to display ground frequencies even when it doesn't detect the station online. This is useful when a tower controller has the ground frequencies cross-coupled and is anticipating a ground controller to come online shortly.
+
+This setting will not be saved and is for the current session only.
+
+#### TWR override
+
+`.delhelx twr`
+
+Toggles tower "online" override. This forces DelHelX to display tower frequencies even when it doesn't detect the station online. This is useful when an approach controller has the tower frequencies cross-coupled and is anticipating a tower controller to come online shortly.
+
+This setting will not be saved and is for the current session only.
+
+#### Redo clearance flags
+
+`.delhelx redoflags`
+
+Toggles all clearance flags for aircraft with existing clearances OFF then back ON. This allows newly joined controllers to see all aircraft with existing clearances. Use this instead of clicking them all one by one.
+
+#### Plugin reset
+
+`.delhelx reset`
+
+Resets all the configuration of DelHelX to their defaults, including saved settings.
+
+#### Disable FPLN checks (testing only)
+
+`.delhelx nocheck`
+
+Toggles the flight plan checks, this is a testing feature only and should never be used when actively controlling. Checks skipped are `!RWY`, `!ASSR` and `!CLR`.
+
+#### Test QNH change (testing only)
+
+`.delhelx testqnh`
+
+Creates a dummy METAR for the LOWW station with a QNH of 2000 to force a change from whatever currently active value in order to trigger the NQNH strip annotation for all cleared aircraft. It doesn't change the active METAR in EuroScope but should still not be used when controlling.
 
 ## Contributing
 
