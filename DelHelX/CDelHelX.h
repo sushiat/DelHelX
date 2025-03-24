@@ -31,6 +31,7 @@ public:
 	void OnFunctionCall(int FunctionId, const char* sItemString, POINT Pt, RECT Area) override;
 	void OnTimer(int Counter) override;
 	EuroScopePlugIn::CRadarScreen* OnRadarScreenCreated(const char* sDisplayName, bool NeedRadarContent, bool GeoReferenced, bool CanBeSaved, bool CanBeCreated) override;
+	void OnNewMetarReceived(const char* sStation, const char* sFullMetar) override;
 
 private:
 	bool updateCheck;
@@ -41,6 +42,7 @@ private:
 	std::future<std::string> latestVersion;
 	RadarScreen* radarScreen;
 	std::map<std::string, airport> airports;
+	std::map<std::string, std::string> airportQNH;
 
 	void LoadSettings();
 	void SaveSettings();
