@@ -34,6 +34,7 @@ public:
 	void OnNewMetarReceived(const char* sStation, const char* sFullMetar) override;
 
 private:
+	bool debug;
 	bool updateCheck;
 	bool flashOnMessage;
 	bool groundOverride;
@@ -53,6 +54,7 @@ private:
 	void RedoFlags();
 
 	void LogMessage(const std::string& message, const std::string& type);
+	void LogDebugMessage(const std::string& message, const std::string& type);
 	void CheckForUpdate();
 };
 

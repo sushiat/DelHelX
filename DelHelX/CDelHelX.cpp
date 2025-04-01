@@ -44,6 +44,7 @@ CDelHelX::~CDelHelX() = default;
 EuroScopePlugIn::CRadarScreen* CDelHelX::OnRadarScreenCreated(const char* sDisplayName, bool NeedRadarContent, bool GeoReferenced, bool CanBeSaved, bool CanBeCreated)
 {
 	this->radarScreen = new RadarScreen();
+	this->radarScreen->debug = this->debug;
 	return this->radarScreen;
 }
 
@@ -63,7 +64,22 @@ bool CDelHelX::OnCompileCommand(const char* sCommandLine)
 			return true;
 		}
 
-		if (args[1] == "update") 
+		if (args[1] == "debug") {
+			if (this->debug) {
+				this->LogMessage("Disabling debug mode", "Debug");
+			}
+			else {
+				this->LogMessage("Enabling debug mode", "Debug");
+			}
+
+			this->debug = !this->debug;
+			this->radarScreen->debug = this->debug;
+
+			this->SaveSettings();
+
+			return true;
+		}
+		else if (args[1] == "update") 
 		{
 			if (this->updateCheck) 
 			{
@@ -587,7 +603,7 @@ void CDelHelX::LoadSettings()
 	if (settings) {
 		std::vector<std::string> splitSettings = split(settings, SETTINGS_DELIMITER);
 
-		if (splitSettings.size() < 2) {
+		if (splitSettings.size() < 3) {
 			this->LogMessage("Invalid saved settings found, reverting to default.", "Settings");
 
 			this->SaveSettings();
@@ -597,6 +613,7 @@ void CDelHelX::LoadSettings()
 
 		std::istringstream(splitSettings[0]) >> this->updateCheck;
 		std::istringstream(splitSettings[1]) >> this->flashOnMessage;
+		std::istringstream(splitSettings[2]) >> this->debug;
 
 		this->LogMessage("Successfully loaded settings.", "Settings");
 	}
@@ -609,7 +626,8 @@ void CDelHelX::SaveSettings()
 {
 	std::ostringstream ss;
 	ss << this->updateCheck << SETTINGS_DELIMITER
-		<< this->flashOnMessage;
+		<< this->flashOnMessage << SETTINGS_DELIMITER
+	    << this->debug;
 
 	this->SaveDataToSettings(PLUGIN_NAME, "DelHelX settings", ss.str().c_str());
 }
@@ -717,54 +735,55 @@ void CDelHelX::LoadConfig()
 	}
 
 	this->LogMessage("Successfully loaded config for " + std::to_string(this->airports.size()) + " airport(s).", "Config");
+
 	for (auto& airport : this->airports)
 	{
-		this->LogMessage("Airport: " + airport.first, "Config");
-		this->LogMessage("--> GND: " + airport.second.gndFreq, "Config");
-		this->LogMessage("--> TWR: " + airport.second.twrFreq, "Config");
-		this->LogMessage("--> APP: " + airport.second.appFreq, "Config");
+		this->LogDebugMessage("Airport: " + airport.first, "Config");
+		this->LogDebugMessage("--> GND: " + airport.second.gndFreq, "Config");
+		this->LogDebugMessage("--> TWR: " + airport.second.twrFreq, "Config");
+		this->LogDebugMessage("--> APP: " + airport.second.appFreq, "Config");
 		int ctrIndex = 0;
 		for (auto ctr : airport.second.ctrStations)
 		{
-			this->LogMessage("--> CTR[" + std::to_string(ctrIndex) + "]: " + ctr, "Config");
+			this->LogDebugMessage("--> CTR[" + std::to_string(ctrIndex) + "]: " + ctr, "Config");
 			ctrIndex++;
 		}
 		for (auto& geoGnd : airport.second.geoGndFreq)
 		{
-			this->LogMessage("--> GeoGnd " + geoGnd.first, "Config");
-			this->LogMessage("----> FRQ: " + geoGnd.second.freq, "Config");
+			this->LogDebugMessage("--> GeoGnd " + geoGnd.first, "Config");
+			this->LogDebugMessage("----> FRQ: " + geoGnd.second.freq, "Config");
 			std::string lat_string = std::accumulate(std::begin(geoGnd.second.lat), std::end(geoGnd.second.lat), std::string(),
 				[](std::string& ss, double s)
 				{
 					return ss.empty() ? std::to_string(s) : ss + ", " + std::to_string(s);
 				});
-			this->LogMessage("----> LAT: " + lat_string, "Config");
+			this->LogDebugMessage("----> LAT: " + lat_string, "Config");
 			std::string lon_string = std::accumulate(std::begin(geoGnd.second.lon), std::end(geoGnd.second.lon), std::string(),
 				[](std::string& ss, double s)
 				{
 					return ss.empty() ? std::to_string(s) : ss + ", " + std::to_string(s);
 				});
-			this->LogMessage("----> LON: " + lon_string, "Config");
+			this->LogDebugMessage("----> LON: " + lon_string, "Config");
 		}
 		for (auto& twrRwy : airport.second.rwyTwrFreq)
 		{
-			this->LogMessage("--> TWR[" + twrRwy.first + "]: " + twrRwy.second, "Config");
+			this->LogDebugMessage("--> TWR[" + twrRwy.first + "]: " + twrRwy.second, "Config");
 		}
 		for (auto& taxiOut : airport.second.taxiOutStands)
 		{
-			this->LogMessage("--> TaxiOut " + taxiOut.first, "Config");
+			this->LogDebugMessage("--> TaxiOut " + taxiOut.first, "Config");
 			std::string lat_string = std::accumulate(std::begin(taxiOut.second.lat), std::end(taxiOut.second.lat), std::string(),
 				[](std::string& ss, double s)
 				{
 					return ss.empty() ? std::to_string(s) : ss + ", " + std::to_string(s);
 				});
-			this->LogMessage("----> LAT: " + lat_string, "Config");
+			this->LogDebugMessage("----> LAT: " + lat_string, "Config");
 			std::string lon_string = std::accumulate(std::begin(taxiOut.second.lon), std::end(taxiOut.second.lon), std::string(),
 				[](std::string& ss, double s)
 				{
 					return ss.empty() ? std::to_string(s) : ss + ", " + std::to_string(s);
 				});
-			this->LogMessage("----> LON: " + lon_string, "Config");
+			this->LogDebugMessage("----> LON: " + lon_string, "Config");
 		}
 	}
 	
@@ -773,6 +792,14 @@ void CDelHelX::LoadConfig()
 void CDelHelX::LogMessage(const std::string& message, const std::string& type)
 {
 	this->DisplayUserMessage(PLUGIN_NAME, type.c_str(), message.c_str(), true, true, true, this->flashOnMessage, false);
+}
+
+
+void CDelHelX::LogDebugMessage(const std::string& message, const std::string& type)
+{
+	if (this->debug) {
+		this->LogMessage(message, type);
+	}
 }
 
 void CDelHelX::OnTimer(int Counter)
@@ -787,7 +814,7 @@ void CDelHelX::OnNewMetarReceived(const char* sStation, const char* sFullMetar)
 	std::string station = sStation;
 	to_upper(station);
 
-	this->LogMessage("New METAR for station " + station + ": " + sFullMetar, "Metar");
+	this->LogDebugMessage("New METAR for station " + station + ": " + sFullMetar, "Metar");
 
 	auto airport = this->airports.find(station);
 	if (airport == this->airports.end())
@@ -808,7 +835,7 @@ void CDelHelX::OnNewMetarReceived(const char* sStation, const char* sFullMetar)
 			auto existingQNH = this->airportQNH.find(station);
 			if (existingQNH == this->airportQNH.end())
 			{
-				this->LogMessage("First QNH value for airport " + station + " is " + metarElement, "Metar");
+				this->LogDebugMessage("First QNH value for airport " + station + " is " + metarElement, "Metar");
 
 				// No existing QNH, add it
 				this->airportQNH.emplace(station, metarElement);
@@ -817,7 +844,7 @@ void CDelHelX::OnNewMetarReceived(const char* sStation, const char* sFullMetar)
 			{
 				if (existingQNH->second != metarElement)
 				{
-					this->LogMessage("New QNH value for airport " + station + " is " + metarElement, "Metar");
+					this->LogDebugMessage("New QNH value for airport " + station + " is " + metarElement, "Metar");
 
 					// Save new QNH
 					this->airportQNH[station] = metarElement;

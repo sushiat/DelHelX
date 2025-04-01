@@ -7,6 +7,7 @@
 
 RadarScreen::RadarScreen() : EuroScopePlugIn::CRadarScreen()
 {
+	this->debug = false;
 }
 
 RadarScreen::~RadarScreen()
@@ -29,7 +30,10 @@ void RadarScreen::OnControllerPositionUpdate(EuroScopePlugIn::CController Contro
 			if (this->groundStations.find(cs) == this->groundStations.end())
 			{
 				this->groundStations.insert(cs);
-				this->GetPlugIn()->DisplayUserMessage(PLUGIN_NAME, "Ground", (cs + " online").c_str(), true, true, true, false, false);
+				if (this->debug) 
+				{
+					this->GetPlugIn()->DisplayUserMessage(PLUGIN_NAME, "Ground", (cs + " online").c_str(), true, true, true, false, false);
+				}
 			}
 		}
 
@@ -38,7 +42,10 @@ void RadarScreen::OnControllerPositionUpdate(EuroScopePlugIn::CController Contro
 			if (this->towerStations.find(cs) == this->towerStations.end())
 			{
 				this->towerStations.insert(cs);
-				this->GetPlugIn()->DisplayUserMessage(PLUGIN_NAME, "Tower", (cs + " online").c_str(), true, true, true, false, false);
+				if (this->debug) 
+				{
+					this->GetPlugIn()->DisplayUserMessage(PLUGIN_NAME, "Tower", (cs + " online").c_str(), true, true, true, false, false);
+				}
 			}
 		}
 
@@ -47,7 +54,10 @@ void RadarScreen::OnControllerPositionUpdate(EuroScopePlugIn::CController Contro
 			if (this->approachStations.find(cs) == this->approachStations.end())
 			{
 				this->approachStations.insert(cs);
-				this->GetPlugIn()->DisplayUserMessage(PLUGIN_NAME, "Approach", (cs + " online").c_str(), true, true, true, false, false);
+				if (this->debug) 
+				{
+					this->GetPlugIn()->DisplayUserMessage(PLUGIN_NAME, "Approach", (cs + " online").c_str(), true, true, true, false, false);
+				}
 			}
 		}
 
@@ -57,7 +67,10 @@ void RadarScreen::OnControllerPositionUpdate(EuroScopePlugIn::CController Contro
 			{
 				double freq = Controller.GetPrimaryFrequency();
 				this->centerStations.emplace(cs, std::to_string(freq));
-				this->GetPlugIn()->DisplayUserMessage(PLUGIN_NAME, "Center", (cs + " online").c_str(), true, true, true, false, false);
+				if (this->debug) 
+				{
+					this->GetPlugIn()->DisplayUserMessage(PLUGIN_NAME, "Center", (cs + " online").c_str(), true, true, true, false, false);
+				}
 			}
 		}
 	}
@@ -73,7 +86,10 @@ void RadarScreen::OnControllerDisconnect(EuroScopePlugIn::CController Controller
 	{
 		if (Controller.GetFacility() == 3)
 		{
-			this->GetPlugIn()->DisplayUserMessage(PLUGIN_NAME, "Ground", (cs + " disconnected").c_str(), true, true, true, false, false);
+			if (this->debug)
+			{
+				this->GetPlugIn()->DisplayUserMessage(PLUGIN_NAME, "Ground", (cs + " disconnected").c_str(), true, true, true, false, false);
+			}
 
 			if (this->groundStations.find(cs) != this->groundStations.end())
 			{
@@ -83,7 +99,10 @@ void RadarScreen::OnControllerDisconnect(EuroScopePlugIn::CController Controller
 
 		if (Controller.GetFacility() == 4 && cs.find("ATIS") == std::string::npos)
 		{
-			this->GetPlugIn()->DisplayUserMessage(PLUGIN_NAME, "Tower", (cs + " disconnected").c_str(), true, true, true, false, false);
+			if (this->debug)
+			{
+				this->GetPlugIn()->DisplayUserMessage(PLUGIN_NAME, "Tower", (cs + " disconnected").c_str(), true, true, true, false, false);
+			}
 
 			if (this->towerStations.find(cs) != this->towerStations.end())
 			{
@@ -93,7 +112,10 @@ void RadarScreen::OnControllerDisconnect(EuroScopePlugIn::CController Controller
 
 		if (Controller.GetFacility() == 5)
 		{
-			this->GetPlugIn()->DisplayUserMessage(PLUGIN_NAME, "Approach", (cs + " disconnected").c_str(), true, true, true, false, false);
+			if (this->debug)
+			{
+				this->GetPlugIn()->DisplayUserMessage(PLUGIN_NAME, "Approach", (cs + " disconnected").c_str(), true, true, true, false, false);
+			}
 
 			if (this->approachStations.find(cs) != this->approachStations.end())
 			{
@@ -103,8 +125,11 @@ void RadarScreen::OnControllerDisconnect(EuroScopePlugIn::CController Controller
 
 		if (Controller.GetFacility() == 6)
 		{
-			this->GetPlugIn()->DisplayUserMessage(PLUGIN_NAME, "Center", (cs + " disconnected").c_str(), true, true, true, false, false);
-
+			if (this->debug)
+			{
+				this->GetPlugIn()->DisplayUserMessage(PLUGIN_NAME, "Center", (cs + " disconnected").c_str(), true, true, true, false, false);
+			}
+			
 			if (this->centerStations.find(cs) != this->centerStations.end())
 			{
 				this->centerStations.erase(cs);
