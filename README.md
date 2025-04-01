@@ -72,6 +72,14 @@ The aircraft is cleared and ready but the current controller doesn't have the pe
 
 Chat commands allow more fine-grained control of `DelHelX`'s behavior and some convinience functions not available via UI elements. Every chat command is prefixed with `.delhelx` and can be entered in every chat channel available. Executing `.delhelx` without any additional commands prints the version loaded and a list of commands available.
 
+#### Toggle debug mode
+
+`.delhelx debug`
+
+Toggles debug mode, which adds many more log messages about the internal operation of the plugin.
+
+This setting will be saved to the Euroscope settings upon exit.
+
 #### Toggle update checks
 
 `.delhelx update`
