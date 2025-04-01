@@ -12,6 +12,7 @@ public:
 	RadarScreen();
 	virtual ~RadarScreen();
 
+	bool debug;
 	std::set<std::string> groundStations;
 	std::set<std::string> towerStations;
 	std::set<std::string> approachStations;
