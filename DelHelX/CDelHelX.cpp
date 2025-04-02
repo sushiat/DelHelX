@@ -2,6 +2,10 @@
 
 #include "CDelHelX.h"
 
+#include <iostream>
+
+#include "date/tz.h"
+
 static CDelHelX* pPlugin;
 
 CDelHelX::CDelHelX() : EuroScopePlugIn::CPlugIn(
@@ -34,6 +38,10 @@ CDelHelX::CDelHelX() : EuroScopePlugIn::CPlugIn(
 	this->LoadSettings();
 	this->LoadConfig();
 
+	std::filesystem::path base(GetPluginDirectory());
+	base.append("tzdata");
+	date::set_install(base.string());
+
 	if (this->updateCheck) {
 		this->latestVersion = std::async(FetchLatestVersion);
 	}
@@ -52,9 +60,9 @@ bool CDelHelX::OnCompileCommand(const char* sCommandLine)
 {
 	std::vector<std::string> args = split(sCommandLine);
 
-	if (starts_with(args[0], ".delhelx")) 
+	if (starts_with(args[0], ".delhelx"))
 	{
-		if (args.size() == 1) 
+		if (args.size() == 1)
 		{
 			std::ostringstream msg;
 			msg << "Version " << PLUGIN_VERSION << " loaded. Available commands: gnd, twr, nocheck, reset, update, flash, redoflags, testqnh";
@@ -79,9 +87,9 @@ bool CDelHelX::OnCompileCommand(const char* sCommandLine)
 
 			return true;
 		}
-		else if (args[1] == "update") 
+		else if (args[1] == "update")
 		{
-			if (this->updateCheck) 
+			if (this->updateCheck)
 			{
 				this->LogMessage("Disabling update check", "Update");
 			}
@@ -95,9 +103,9 @@ bool CDelHelX::OnCompileCommand(const char* sCommandLine)
 
 			return true;
 		}
-		else if (args[1] == "flash") 
+		else if (args[1] == "flash")
 		{
-			if (this->flashOnMessage) 
+			if (this->flashOnMessage)
 			{
 				this->LogMessage("No longer flashing on DelHelX message", "Config");
 			}
@@ -231,21 +239,21 @@ void CDelHelX::RedoFlags()
 
 void CDelHelX::OnGetTagItem(EuroScopePlugIn::CFlightPlan FlightPlan, EuroScopePlugIn::CRadarTarget RadarTarget, int ItemCode, int TagData, char sItemString[16], int* pColorCode, COLORREF* pRGB, double* pFontSize)
 {
-	if (!FlightPlan.IsValid()) 
+	if (!FlightPlan.IsValid())
 	{
 		return;
 	}
-	
-	if (ItemCode == TAG_ITEM_PS_HELPER) 
+
+	if (ItemCode == TAG_ITEM_PS_HELPER)
 	{
 		validation res = this->CheckPushStartStatus(FlightPlan, RadarTarget);
 
-		if (res.valid) 
+		if (res.valid)
 		{
 			strcpy_s(sItemString, 16, res.tag.c_str());
 			*pColorCode = EuroScopePlugIn::TAG_COLOR_RGB_DEFINED;
 
-			if (res.color == TAG_COLOR_NONE) 
+			if (res.color == TAG_COLOR_NONE)
 			{
 				*pRGB = TAG_COLOR_GREEN;
 			}
@@ -257,7 +265,7 @@ void CDelHelX::OnGetTagItem(EuroScopePlugIn::CFlightPlan FlightPlan, EuroScopePl
 		{
 			strcpy_s(sItemString, 16, res.tag.c_str());
 
-			if (res.color != TAG_COLOR_NONE) 
+			if (res.color != TAG_COLOR_NONE)
 			{
 				*pColorCode = EuroScopePlugIn::TAG_COLOR_RGB_DEFINED;
 				*pRGB = res.color;
@@ -324,7 +332,7 @@ void CDelHelX::OnGetTagItem(EuroScopePlugIn::CFlightPlan FlightPlan, EuroScopePl
 	{
 		EuroScopePlugIn::CFlightPlanControllerAssignedData fpcad = FlightPlan.GetControllerAssignedData();
 		std::string annotation = fpcad.GetFlightStripAnnotation(2);
-		if (annotation=="NQNH")
+		if (annotation == "NQNH")
 		{
 			strcpy_s(sItemString, 16, "X");
 			*pColorCode = EuroScopePlugIn::TAG_COLOR_RGB_DEFINED;
@@ -483,12 +491,13 @@ validation CDelHelX::CheckPushStartStatus(EuroScopePlugIn::CFlightPlan& fp, Euro
 	}
 
 	EuroScopePlugIn::CController me = this->ControllerMyself();
-	if (me.IsController() && me.GetRating()>1 && me.GetFacility() >= 3)
+	if (me.IsController() && me.GetRating() > 1 && me.GetFacility() >= 3)
 	{
 		if (res.tag.empty())
 		{
 			res.tag = "OK";
-		} else
+		}
+		else
 		{
 			res.tag += "->OK";
 		}
@@ -627,7 +636,7 @@ void CDelHelX::SaveSettings()
 	std::ostringstream ss;
 	ss << this->updateCheck << SETTINGS_DELIMITER
 		<< this->flashOnMessage << SETTINGS_DELIMITER
-	    << this->debug;
+		<< this->debug;
 
 	this->SaveDataToSettings(PLUGIN_NAME, "DelHelX settings", ss.str().c_str());
 }
@@ -635,7 +644,7 @@ void CDelHelX::SaveSettings()
 void CDelHelX::LoadConfig()
 {
 	json config;
-	try 
+	try
 	{
 		std::filesystem::path base(GetPluginDirectory());
 		base.append("config.json");
@@ -653,7 +662,7 @@ void CDelHelX::LoadConfig()
 	for (auto& [icao, json_airport] : config.items())
 	{
 		// Get basic airport attributes
-		airport ap {
+		airport ap{
 			icao,
 			json_airport.value<std::string>("gndFreq", ""),
 			json_airport.value<std::string>("twrFreq", ""),
@@ -664,7 +673,7 @@ void CDelHelX::LoadConfig()
 		ap.ctrStations = ctrStations;
 
 		json json_geoGnds;
-		try 
+		try
 		{
 			json_geoGnds = json_airport.at("geoGndFreq");
 		}
@@ -676,7 +685,7 @@ void CDelHelX::LoadConfig()
 
 		for (auto& [name, json_geoGnd] : json_geoGnds.items())
 		{
-			geoGndFreq ggf {
+			geoGndFreq ggf{
 				name,
 				json_geoGnd.value<std::string>("freq", "")
 			};
@@ -690,7 +699,7 @@ void CDelHelX::LoadConfig()
 		}
 
 		json json_rwyTwrs;
-		try 
+		try
 		{
 			json_rwyTwrs = json_airport.at("rwyTwrFreq");
 		}
@@ -707,7 +716,7 @@ void CDelHelX::LoadConfig()
 		}
 
 		json json_taxiouts;
-		try 
+		try
 		{
 			json_taxiouts = json_airport.at("taxiOutStands");
 		}
@@ -719,7 +728,7 @@ void CDelHelX::LoadConfig()
 
 		for (auto& [name, json_taxiout] : json_taxiouts.items())
 		{
-			taxiOutStands tos {
+			taxiOutStands tos{
 				name
 			};
 
@@ -730,6 +739,27 @@ void CDelHelX::LoadConfig()
 
 			ap.taxiOutStands.emplace(name, tos);
 		}
+
+		json json_nap_reminder;
+		try
+		{
+			json_nap_reminder = json_airport.at("napReminder");
+		}
+		catch (std::exception e)
+		{
+			this->LogMessage("Failed to load NAP reminder config for airport \"" + icao + "\". Error: " + std::string(e.what()), "Config");
+			continue;
+		}
+
+		napReminder reminder{
+			json_nap_reminder.value<bool>("enabled", false),
+			json_nap_reminder.value<int>("hour", 0),
+			json_nap_reminder.value<int>("minute", 0),
+			json_nap_reminder.value<std::string>("tzone", ""),
+			false
+		};
+		ap.nap_reminder = reminder;
+
 
 		this->airports.emplace(icao, ap);
 	}
@@ -785,8 +815,9 @@ void CDelHelX::LoadConfig()
 				});
 			this->LogDebugMessage("----> LON: " + lon_string, "Config");
 		}
+		this->LogDebugMessage("---> NAP reminder: Enabled=" + std::to_string(airport.second.nap_reminder.enabled) + ", Hour=" + std::to_string(airport.second.nap_reminder.hour) + ", Minute=" + std::to_string(airport.second.nap_reminder.minute) + ", TZone=" + airport.second.nap_reminder.tzone, "Config");
 	}
-	
+
 }
 
 void CDelHelX::LogMessage(const std::string& message, const std::string& type)
@@ -806,6 +837,46 @@ void CDelHelX::OnTimer(int Counter)
 {
 	if (this->updateCheck && this->latestVersion.valid() && this->latestVersion.wait_for(0ms) == std::future_status::ready) {
 		this->CheckForUpdate();
+	}
+
+	if (Counter > 0 && Counter % 10 == 0)
+	{
+		for (auto& airport : this->airports)
+		{
+			if (airport.second.nap_reminder.enabled && !airport.second.nap_reminder.triggered)
+			{
+				try
+				{
+					std::ostringstream timeStream;
+					timeStream << date::make_zoned(airport.second.nap_reminder.tzone, std::chrono::system_clock::now());
+					std::string timeString = timeStream.str();
+
+					std::vector<std::string> timeSplit = split(timeString, ' ');
+					if (timeSplit.size() == 3)
+					{
+						auto tod = timeSplit[1];
+						std::vector<std::string> todSplit = split(tod, ':');
+						if (todSplit.size() == 3)
+						{
+							int hours = atoi(todSplit[0].c_str());
+							int minutes = atoi(todSplit[1].c_str());
+
+							if ((hours == airport.second.nap_reminder.hour && minutes >= airport.second.nap_reminder.minute) || hours > airport.second.nap_reminder.hour)
+							{
+								airport.second.nap_reminder.triggered = true;
+
+								Beep(1568, 300);
+								MessageBox(nullptr, ("What's the NAP procedure for " + airport.first + " tonight?").c_str(), "DelHelX Plugin", MB_OK | MB_ICONQUESTION | MB_TOPMOST);
+							}
+						}
+					}
+				}
+				catch (std::exception e)
+				{
+					this->LogMessage("Error processing NAP-reminder for airport " + airport.first + ". Error: " + std::string(e.what()), "Config");
+				}
+			}
+		}
 	}
 }
 

@@ -19,6 +19,15 @@ struct taxiOutStands
 	std::vector<double> lon;
 };
 
+struct napReminder
+{
+	bool enabled;
+	int hour;
+	int minute;
+	std::string tzone;
+	bool triggered;
+};
+
 struct airport
 {
 	std::string icao;
@@ -30,4 +39,5 @@ struct airport
 	std::map<std::string, std::string> rwyTwrFreq;
 	std::vector<std::string> ctrStations;
 	std::map<std::string, taxiOutStands> taxiOutStands;
+	napReminder nap_reminder;
 };
