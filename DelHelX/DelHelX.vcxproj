@@ -212,12 +212,17 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="RadarScreen.cpp" />
+    <ClCompile Include="tz.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\config.json" />
     <None Include="DelHelX.def" />
     <None Include="res\DelHelX.rc2" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\include\date\date.h" />
+    <ClInclude Include="..\include\date\tz.h" />
+    <ClInclude Include="..\include\date\tz_private.h" />
     <ClInclude Include="config.h" />
     <ClInclude Include="CDelHelX.h" />
     <ClInclude Include="constants.h" />
