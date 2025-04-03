@@ -47,7 +47,7 @@
         },
         "napReminder": {
           "enabled": true,
-          "hour": 19,
+          "hour": 20,
           "minute": 40,
           "tzone": "Europe/Vienna"
         }
